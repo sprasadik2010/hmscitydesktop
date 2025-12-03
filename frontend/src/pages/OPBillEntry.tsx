@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
-import { Save, Trash2, X, Printer, Search, Building, CalendarClock, User, Stethoscope, CreditCard, Shield, FileText, IndianRupee, Calculator, Percent, Users, MapPin, Phone, Mail } from 'lucide-react'
+import { Save, Trash2, X, Printer, Search, Building, CalendarClock, User, Stethoscope, Shield, FileText, IndianRupee, Calculator, Percent, Users, MapPin, Phone, Mail } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
 
@@ -67,6 +67,7 @@ const OPBillEntry = () => {
   ])
 
   useEffect(() => {
+    setIsLoading(false)
     fetchDoctors()
     fetchPatients()
   }, [])
@@ -173,74 +174,74 @@ const OPBillEntry = () => {
     return { totalAmount, totalDiscount, netAmount }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  // const handleSubmit = async (e: React.FormEvent) => {
+  //   e.preventDefault()
     
-    if (!selectedPatient) {
-      toast.error('Please select a patient')
-      return
-    }
+  //   if (!selectedPatient) {
+  //     toast.error('Please select a patient')
+  //     return
+  //   }
     
-    if (!formData.doctor_id) {
-      toast.error('Please select a doctor')
-      return
-    }
+  //   if (!formData.doctor_id) {
+  //     toast.error('Please select a doctor')
+  //     return
+  //   }
     
-    const { netAmount } = calculateTotals()
+  //   const { netAmount } = calculateTotals()
     
-    if (netAmount <= 0) {
-      toast.error('Total amount must be greater than 0')
-      return
-    }
+  //   if (netAmount <= 0) {
+  //     toast.error('Total amount must be greater than 0')
+  //     return
+  //   }
     
-    setIsLoading(true)
+  //   setIsLoading(true)
     
-    try {
-      const billData = {
-        patient_id: selectedPatient.id,
-        bill_type: formData.bill_type,
-        category: formData.category,
-        doctor_id: formData.doctor_id,
-        discount_type: formData.discount_type,
-        items: billItems.map(item => ({
-          particular: item.particular,
-          doctor: item.doctor,
-          department: item.department,
-          unit: item.unit,
-          rate: item.rate,
-          discount_percent: item.discount_percent
-        }))
-      }
+  //   try {
+  //     const billData = {
+  //       patient_id: selectedPatient.id,
+  //       bill_type: formData.bill_type,
+  //       category: formData.category,
+  //       doctor_id: formData.doctor_id,
+  //       discount_type: formData.discount_type,
+  //       items: billItems.map(item => ({
+  //         particular: item.particular,
+  //         doctor: item.doctor,
+  //         department: item.department,
+  //         unit: item.unit,
+  //         rate: item.rate,
+  //         discount_percent: item.discount_percent
+  //       }))
+  //     }
       
-      const response = await axios.post('/bills/op', billData)
-      toast.success(`OP Bill created successfully: ${response.data.bill_number}`)
+  //     const response = await axios.post('/bills/op', billData)
+  //     toast.success(`OP Bill created successfully: ${response.data.bill_number}`)
       
-      // Reset form
-      setFormData({
-        patient_id: 0,
-        op_number: '',
-        bill_type: 'Cash',
-        category: 'General',
-        doctor_id: doctors[0]?.id || 0,
-        discount_type: 'None'
-      })
-      setSelectedPatient(null)
-      setBillItems([{
-        particular: 'Consultation',
-        doctor: '',
-        department: 'OPD',
-        unit: 1,
-        rate: 0,
-        discount_percent: 0,
-        discount_amount: 0,
-        total: 0
-      }])
-    } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Failed to create bill')
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  //     // Reset form
+  //     setFormData({
+  //       patient_id: 0,
+  //       op_number: '',
+  //       bill_type: 'Cash',
+  //       category: 'General',
+  //       doctor_id: doctors[0]?.id || 0,
+  //       discount_type: 'None'
+  //     })
+  //     setSelectedPatient(null)
+  //     setBillItems([{
+  //       particular: 'Consultation',
+  //       doctor: '',
+  //       department: 'OPD',
+  //       unit: 1,
+  //       rate: 0,
+  //       discount_percent: 0,
+  //       discount_amount: 0,
+  //       total: 0
+  //     }])
+  //   } catch (error: any) {
+  //     toast.error(error.response?.data?.detail || 'Failed to create bill')
+  //   } finally {
+  //     setIsLoading(false)
+  //   }
+  // }
 
   const handlePrint = () => {
     window.print()

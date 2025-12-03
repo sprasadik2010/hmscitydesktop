@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
-import { Save, X, Search, Trash2, User, Phone, MapPin, Stethoscope, CalendarClock, Building, FileText, UserCheck, Home, Navigation, Clock } from 'lucide-react'
+import { Save, X, Search, Trash2, User, Phone, MapPin, CalendarClock, Building, FileText, UserCheck, Home, Clock } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
 
@@ -51,9 +51,10 @@ const PatientRegistration = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [currentTime, setCurrentTime] = useState(new Date())
   const [opNumber, setOpNumber] = useState('')
-  const [showPatientSearch, setShowPatientSearch] = useState(false)
+  // const [showPatientSearch, setShowPatientSearch] = useState(false)
 
   useEffect(() => {
+    setIsLoading(false)
     fetchDoctors()
     const timer = setInterval(() => setCurrentTime(new Date()), 1000)
     return () => clearInterval(timer)
@@ -108,43 +109,6 @@ const PatientRegistration = () => {
       toast.success('Patient data loaded successfully')
     } catch (error) {
       toast.error('Patient not found')
-    }
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (!formData.name || !formData.phone || !formData.doctor_id) {
-      toast.error('Please fill required fields')
-      return
-    }
-    
-    setIsLoading(true)
-    
-    try {
-      await axios.post('/patients', formData)
-      toast.success(`Patient registered successfully as ${isIP ? 'Inpatient (IP)' : 'Outpatient (OP)'}`)
-      
-      // Reset form
-      setFormData({
-        name: '',
-        age: '',
-        gender: 'Male',
-        complaint: '',
-        house: '',
-        street: '',
-        place: '',
-        phone: '',
-        doctor_id: doctors[0]?.id || 0,
-        referred_by: '',
-        room: '',
-        is_ip: isIP
-      })
-      setOpNumber('')
-    } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Registration failed')
-    } finally {
-      setIsLoading(false)
     }
   }
 
