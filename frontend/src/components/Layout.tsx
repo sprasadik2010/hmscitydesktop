@@ -2,7 +2,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { 
   Home, 
-  Users, 
+  // Users, 
   UserPlus, 
   Stethoscope, 
   FileText, 
@@ -19,7 +19,7 @@ import {
   ChevronLeft,
   HelpCircle,
   Shield,
-  CreditCard
+  // CreditCard
 } from 'lucide-react'
 import { useState } from 'react'
 import toast from 'react-hot-toast'

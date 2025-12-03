@@ -175,86 +175,86 @@ const IPBillEntry = () => {
     return { totalAmount, totalDiscount, subTotal, netAmount }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  // const handleSubmit = async (e: React.FormEvent) => {
+  //   e.preventDefault()
     
-    if (!selectedPatient) {
-      toast.error('Please select a patient')
-      return
-    }
+  //   if (!selectedPatient) {
+  //     toast.error('Please select a patient')
+  //     return
+  //   }
     
-    if (!formData.doctor_id) {
-      toast.error('Please select a doctor')
-      return
-    }
+  //   if (!formData.doctor_id) {
+  //     toast.error('Please select a doctor')
+  //     return
+  //   }
     
-    const { netAmount } = calculateTotals()
+  //   const { netAmount } = calculateTotals()
     
-    if (netAmount <= 0) {
-      toast.error('Total amount must be greater than 0')
-      return
-    }
+  //   if (netAmount <= 0) {
+  //     toast.error('Total amount must be greater than 0')
+  //     return
+  //   }
     
-    setIsLoading(true)
+  //   setIsLoading(true)
     
-    try {
-      const billData = {
-        patient_id: selectedPatient.id,
-        is_credit: formData.is_credit,
-        is_insurance: formData.is_insurance,
-        category: formData.category,
-        doctor_id: formData.doctor_id,
-        discount_type: formData.discount_type,
-        room: formData.room,
-        admission_date: new Date(formData.admission_date).toISOString(),
-        insurance_company: formData.insurance_company || null,
-        third_party: formData.third_party || null,
-        service_tax: formData.service_tax,
-        education_cess: formData.education_cess,
-        she_education_cess: formData.she_education_cess,
-        items: billItems.map(item => ({
-          particular: item.particular,
-          department: item.department,
-          amount: item.amount,
-          discount_percent: item.discount_percent
-        }))
-      }
+  //   try {
+  //     const billData = {
+  //       patient_id: selectedPatient.id,
+  //       is_credit: formData.is_credit,
+  //       is_insurance: formData.is_insurance,
+  //       category: formData.category,
+  //       doctor_id: formData.doctor_id,
+  //       discount_type: formData.discount_type,
+  //       room: formData.room,
+  //       admission_date: new Date(formData.admission_date).toISOString(),
+  //       insurance_company: formData.insurance_company || null,
+  //       third_party: formData.third_party || null,
+  //       service_tax: formData.service_tax,
+  //       education_cess: formData.education_cess,
+  //       she_education_cess: formData.she_education_cess,
+  //       items: billItems.map(item => ({
+  //         particular: item.particular,
+  //         department: item.department,
+  //         amount: item.amount,
+  //         discount_percent: item.discount_percent
+  //       }))
+  //     }
       
-      const response = await axios.post('/bills/ip', billData)
-      toast.success(`IP Bill created successfully: ${response.data.bill_number}`)
+  //     const response = await axios.post('/bills/ip', billData)
+  //     toast.success(`IP Bill created successfully: ${response.data.bill_number}`)
       
-      // Reset form
-      setFormData({
-        patient_id: 0,
-        ip_number: '',
-        is_credit: false,
-        is_insurance: false,
-        category: 'General',
-        doctor_id: doctors[0]?.id || 0,
-        discount_type: 'None',
-        room: '',
-        admission_date: format(new Date(), 'yyyy-MM-dd'),
-        insurance_company: '',
-        third_party: '',
-        service_tax: 0,
-        education_cess: 0,
-        she_education_cess: 0
-      })
-      setSelectedPatient(null)
-      setBillItems([{
-        particular: 'Room Charges',
-        department: 'General',
-        amount: 0,
-        discount_percent: 0,
-        discount_amount: 0,
-        total: 0
-      }])
-    } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Failed to create bill')
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  //     // Reset form
+  //     setFormData({
+  //       patient_id: 0,
+  //       ip_number: '',
+  //       is_credit: false,
+  //       is_insurance: false,
+  //       category: 'General',
+  //       doctor_id: doctors[0]?.id || 0,
+  //       discount_type: 'None',
+  //       room: '',
+  //       admission_date: format(new Date(), 'yyyy-MM-dd'),
+  //       insurance_company: '',
+  //       third_party: '',
+  //       service_tax: 0,
+  //       education_cess: 0,
+  //       she_education_cess: 0
+  //     })
+  //     setSelectedPatient(null)
+  //     setBillItems([{
+  //       particular: 'Room Charges',
+  //       department: 'General',
+  //       amount: 0,
+  //       discount_percent: 0,
+  //       discount_amount: 0,
+  //       total: 0
+  //     }])
+  //   } catch (error: any) {
+  //     toast.error(error.response?.data?.detail || 'Failed to create bill')
+  //   } finally {
+  //     setIsLoading(false)
+  //   }
+  // }
 
   const handlePrint = () => {
     window.print()
