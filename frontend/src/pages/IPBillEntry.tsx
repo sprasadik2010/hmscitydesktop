@@ -69,6 +69,7 @@ const IPBillEntry = () => {
   ])
 
   useEffect(() => {
+    setIsLoading(false)
     fetchDoctors()
     fetchPatients()
   }, [])
