@@ -124,7 +124,7 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_user)
     
-    return {"message": "User created successfully"}
+    return {"message": "User created successfully !"}
 
 @router.get("/me")
 async def read_users_me(current_user: User = Depends(get_current_user)):
