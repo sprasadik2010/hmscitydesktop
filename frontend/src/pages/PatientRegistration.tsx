@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
-import { Save, X, Search, Trash2, User, Phone, MapPin, CalendarClock, Building, FileText, UserCheck, Home, Clock } from 'lucide-react'
+import { Save, X, Search, Trash2, User, Phone, MapPin, CalendarClock, Building, FileText, UserCheck, Home, Clock, Users, Eye, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
 
@@ -9,6 +9,20 @@ interface Doctor {
   id: number
   name: string
   code: string
+}
+
+interface Patient {
+  id: number
+  patient_number: string
+  name: string
+  age: string
+  gender: 'Male' | 'Female' | 'Other'
+  complaint: string
+  phone: string
+  doctor_id: number
+  doctor_name?: string
+  registration_date?: string
+  is_ip: boolean
 }
 
 interface PatientFormData {
@@ -50,8 +64,11 @@ const PatientRegistration = () => {
   const [doctors, setDoctors] = useState<Doctor[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [currentTime, setCurrentTime] = useState(new Date())
-  const [opNumber, setOpNumber] = useState('')
-  // const [showPatientSearch, setShowPatientSearch] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [showPatientList, setShowPatientList] = useState(false)
+  const [patients, setPatients] = useState<Patient[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
 
   useEffect(() => {
     fetchDoctors()
@@ -125,7 +142,8 @@ const PatientRegistration = () => {
         room: '',
         is_ip: isIP
       })
-      setOpNumber('')
+      setSearchTerm('')
+      setSelectedPatient(null)
 
       // Optionally navigate to dashboard after 2 seconds
       setTimeout(() => {
@@ -134,7 +152,6 @@ const PatientRegistration = () => {
 
     } catch (error: any) {
       console.error('Registration error:', error)
-      // Check for specific error responses
       if (error.response?.status === 400) {
         toast.error(error.response?.data?.detail || 'Invalid data. Please check all fields.')
       } else if (error.response?.status === 409) {
@@ -150,35 +167,44 @@ const PatientRegistration = () => {
     }
   }
 
-  const handleSearchOP = async () => {
-    if (!opNumber.trim()) {
-      toast.error('Please enter OP number')
+  const handleSearchPatients = async () => {
+    if (!searchTerm.trim()) {
+      toast.error('Please enter search term')
       return
     }
 
+    setIsSearching(true)
     try {
-      const response = await axios.get(`/patients/search/op/${opNumber}`)
-      const patient = response.data
-      
-      setFormData({
-        name: patient.name,
-        age: patient.age,
-        gender: patient.gender,
-        complaint: patient.complaint,
-        house: patient.house,
-        street: patient.street,
-        place: patient.place,
-        phone: patient.phone,
-        doctor_id: patient.doctor_id,
-        referred_by: patient.referred_by || '',
-        room: patient.room || '',
-        is_ip: isIP
-      })
-      
-      toast.success('Patient data loaded successfully')
+      const response = await axios.get(`/patients/search?query=${searchTerm}`)
+      setPatients(response.data)
+      setShowPatientList(true)
+      toast.success(`Found ${response.data.length} patients`)
     } catch (error) {
-      toast.error('Patient not found')
+      toast.error('Failed to search patients')
+      setPatients([])
+    } finally {
+      setIsSearching(false)
     }
+  }
+
+  const handleSelectPatient = (patient: Patient) => {
+    setSelectedPatient(patient)
+    setFormData({
+      name: patient.name,
+      age: patient.age,
+      gender: patient.gender,
+      complaint: patient.complaint,
+      house: '',
+      street: '',
+      place: '',
+      phone: patient.phone,
+      doctor_id: patient.doctor_id,
+      referred_by: '',
+      room: '',
+      is_ip: isIP
+    })
+    setShowPatientList(false)
+    toast.success(`Loaded data for ${patient.name}`)
   }
 
   const handleDelete = () => {
@@ -197,9 +223,16 @@ const PatientRegistration = () => {
         room: '',
         is_ip: isIP
       })
-      setOpNumber('')
+      setSearchTerm('')
+      setSelectedPatient(null)
+      setPatients([])
+      setShowPatientList(false)
       toast.success('Form cleared successfully')
     }
+  }
+
+  const handleViewPatient = (patientId: number) => {
+    navigate(`/patients/${patientId}`)
   }
 
   return (
@@ -282,50 +315,167 @@ const PatientRegistration = () => {
       {/* Main Form */}
       <div className="bg-white rounded-2xl shadow-lg border border-gray-200">
         <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-cyan-50">
-          <h2 className="text-xl font-bold text-gray-900 flex items-center">
-            <User className="mr-3 text-blue-600" size={24} />
-            Patient Information
-          </h2>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <h2 className="text-xl font-bold text-gray-900 flex items-center">
+              <User className="mr-3 text-blue-600" size={24} />
+              Patient Information
+            </h2>
+            
+            {/* Search Patients Section */}
+            <div className="flex items-center space-x-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSearchPatients()}
+                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-64"
+                  placeholder="Search by name, phone, or number..."
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleSearchPatients}
+                disabled={isSearching}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center disabled:opacity-50"
+              >
+                {isSearching ? (
+                  <Loader2 className="animate-spin mr-2" size={18} />
+                ) : (
+                  <Search size={18} className="mr-2" />
+                )}
+                Search
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowPatientList(!showPatientList)}
+                className="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors flex items-center"
+              >
+                <Users size={18} className="mr-2" />
+                {showPatientList ? 'Hide List' : 'Show All'}
+              </button>
+            </div>
+          </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-8">
-          {/* OP Number Search (Only for IP Registration) */}
-          {isIP && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                <Search className="mr-2 text-blue-600" size={20} />
-                Search Existing Patient
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-900 mb-2">
-                    OP Number *
-                  </label>
-                  <div className="relative">
-                    <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-                    <input
-                      type="text"
-                      value={opNumber}
-                      onChange={(e) => setOpNumber(e.target.value)}
-                      className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Enter existing OP number (e.g., 202512-001)"
-                    />
+        {/* Patient List Modal/Overlay */}
+        {showPatientList && (
+          <div className="px-6 pt-4">
+            <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                  <Users className="mr-2" size={20} />
+                  Patient Search Results
+                </h3>
+                <button
+                  onClick={() => setShowPatientList(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              
+              {patients.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <Users className="mx-auto mb-3" size={40} />
+                  <p>No patients found. Try a different search term.</p>
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-64 overflow-y-auto">
+                  {patients.map((patient) => (
+                    <div
+                      key={patient.id}
+                      className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-lg hover:bg-blue-50 transition-colors"
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center">
+                          <div className={`w-3 h-3 rounded-full mr-3 ${patient.is_ip ? 'bg-purple-500' : 'bg-blue-500'}`} />
+                          <div>
+                            <div className="flex items-center">
+                              <h4 className="font-semibold text-gray-900">{patient.name}</h4>
+                              <span className="ml-2 px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
+                                {patient.patient_number}
+                              </span>
+                            </div>
+                            <div className="flex items-center text-sm text-gray-600 mt-1">
+                              <span className="mr-4">Age: {patient.age}</span>
+                              <span className="mr-4">Gender: {patient.gender}</span>
+                              <span>Phone: {patient.phone}</span>
+                            </div>
+                            <p className="text-sm text-gray-600 mt-1 truncate">
+                              Complaint: {patient.complaint}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => handleSelectPatient(patient)}
+                          className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                          Use for {isIP ? 'IP' : 'OP'}
+                        </button>
+                        <button
+                          onClick={() => handleViewPatient(patient.id)}
+                          className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-100 transition-colors flex items-center"
+                        >
+                          <Eye size={14} className="mr-1" />
+                          View
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Selected Patient Info */}
+        {selectedPatient && (
+          <div className="px-6 pt-4">
+            <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <UserCheck className="text-green-600 mr-3" size={20} />
+                  <div>
+                    <h3 className="font-semibold text-green-900">
+                      Using data from: {selectedPatient.name}
+                    </h3>
+                    <p className="text-sm text-green-700">
+                      {selectedPatient.patient_number} • {selectedPatient.age} • {selectedPatient.gender}
+                    </p>
                   </div>
                 </div>
-                <div className="flex items-end">
-                  <button
-                    type="button"
-                    onClick={handleSearchOP}
-                    className="w-full py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white font-medium rounded-xl hover:from-blue-700 hover:to-cyan-700 transition-all shadow-md flex items-center justify-center"
-                  >
-                    <Search size={20} className="mr-2" />
-                    Search Patient
-                  </button>
-                </div>
+                <button
+                  onClick={() => {
+                    setSelectedPatient(null)
+                    setFormData({
+                      name: '',
+                      age: '',
+                      gender: 'Male',
+                      complaint: '',
+                      house: '',
+                      street: '',
+                      place: '',
+                      phone: '',
+                      doctor_id: doctors[0]?.id || 0,
+                      referred_by: '',
+                      room: '',
+                      is_ip: isIP
+                    })
+                  }}
+                  className="text-green-700 hover:text-green-900 text-sm"
+                >
+                  Clear Selection
+                </button>
               </div>
             </div>
-          )}
+          </div>
+        )}
 
+        <form onSubmit={handleSubmit} className="p-6 space-y-8">
           {/* Basic Information */}
           <div className="space-y-6">
             <h3 className="text-lg font-semibold text-gray-900 flex items-center">
@@ -529,7 +679,13 @@ const PatientRegistration = () => {
           {/* Form Actions */}
           <div className="flex flex-col sm:flex-row items-center justify-between space-y-4 sm:space-y-0 pt-6 border-t">
             <div className="text-sm text-gray-600">
-              Logged in as: <span className="font-semibold text-gray-900">Hospital Staff</span>
+              {selectedPatient ? (
+                <span className="text-green-600 font-semibold">
+                  Using data from existing patient: {selectedPatient.name}
+                </span>
+              ) : (
+                'Logged in as: <span className="font-semibold text-gray-900">Hospital Staff</span>'
+              )}
             </div>
             
             <div className="flex flex-wrap gap-3">
@@ -556,7 +712,11 @@ const PatientRegistration = () => {
                 disabled={isLoading}
                 className={`px-6 py-2.5 text-white font-medium rounded-xl hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md flex items-center ${isIP ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700' : 'bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700'}`}
               >
-                <Save size={18} className="mr-2" />
+                {isLoading ? (
+                  <Loader2 className="animate-spin mr-2" size={18} />
+                ) : (
+                  <Save size={18} className="mr-2" />
+                )}
                 {isLoading ? 'Registering...' : `Register as ${isIP ? 'IP' : 'OP'}`}
               </button>
             </div>
