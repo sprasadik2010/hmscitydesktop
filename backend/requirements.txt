@@ -1,10 +1,10 @@
 fastapi==0.110.0
 uvicorn[standard]==0.29.0
-sqlalchemy==2.0.30  # Latest 2.0.x that has better 3.13 support
+sqlalchemy==2.0.28
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 python-multipart==0.0.9
 python-dotenv==1.0.0
-pydantic==2.10.0
+pydantic==2.7.4  # Changed from 2.6.4 to 2.7.4
 pydantic-settings==2.1.0
-typing-extensions==4.15.0  # Important for Python 3.13 compatibility
+# Remove typing-extensions line completely
