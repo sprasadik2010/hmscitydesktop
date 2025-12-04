@@ -89,13 +89,16 @@ const PatientRegistration = () => {
   }
 
   const fetchAllPatients = async () => {
+    console.log('Fetching all patients...')
     setIsSearching(true)
     try {
       const response = await axios.get('/patients')
+      console.log('All patients response:', response.data)
       setPatients(response.data)
       setShowPatientList(true)
       toast.success(`Showing ${response.data.length} patients`)
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Error fetching all patients:', error)
       toast.error('Failed to load patients')
       setPatients([])
     } finally {
@@ -104,6 +107,7 @@ const PatientRegistration = () => {
   }
 
   const handleShowAllPatients = async () => {
+    console.log('Show All button clicked, showPatientList:', showPatientList)
     if (showPatientList) {
       // If already showing, hide it
       setShowPatientList(false)
@@ -374,7 +378,10 @@ const PatientRegistration = () => {
               </button>
               <button
                 type="button"
-                onClick={handleShowAllPatients}
+                onClick={() => {
+                  console.log('Direct onClick called')
+                  handleShowAllPatients()
+                }}
                 disabled={isSearching}
                 className="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors flex items-center disabled:opacity-50"
               >
