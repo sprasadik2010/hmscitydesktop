@@ -45,7 +45,7 @@ const PatientRegistration = () => {
   const navigate = useNavigate()
   const type = searchParams.get('type') || 'op'
   const isIP = type === 'ip'
-  
+
   const [formData, setFormData] = useState<PatientFormData>({
     name: '',
     age: '',
@@ -60,7 +60,7 @@ const PatientRegistration = () => {
     room: '',
     is_ip: isIP
   })
-  
+
   const [doctors, setDoctors] = useState<Doctor[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [currentTime, setCurrentTime] = useState(new Date())
@@ -88,11 +88,36 @@ const PatientRegistration = () => {
     }
   }
 
+  const fetchAllPatients = async () => {
+    setIsSearching(true)
+    try {
+      const response = await axios.get('/patients')
+      setPatients(response.data)
+      setShowPatientList(true)
+      toast.success(`Showing ${response.data.length} patients`)
+    } catch (error) {
+      toast.error('Failed to load patients')
+      setPatients([])
+    } finally {
+      setIsSearching(false)
+    }
+  }
+
+  const handleShowAllPatients = async () => {
+    if (showPatientList) {
+      // If already showing, hide it
+      setShowPatientList(false)
+    } else {
+      // If not showing, fetch all patients
+      await fetchAllPatients()
+    }
+  }
+
   const generatePatientNumber = () => {
     const now = new Date()
     const yearMonth = format(now, 'yyyyMM')
     const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
-    return isIP 
+    return isIP
       ? `IP-${yearMonth}-${Math.floor(Math.random() * 1000000).toString().padStart(6, '0')}`
       : `OP-${yearMonth}-${random}`
   }
@@ -111,7 +136,7 @@ const PatientRegistration = () => {
     try {
       // Generate patient number
       const patientNumber = generatePatientNumber()
-      
+
       // Prepare data for API
       const patientData = {
         ...formData,
@@ -124,9 +149,9 @@ const PatientRegistration = () => {
 
       // Call your patient registration API endpoint
       await axios.post('/patients', patientData)
-      
+
       toast.success(`Patient registered successfully! ${isIP ? 'IP' : 'OP'} Number: ${patientNumber}`)
-      
+
       // Reset form after successful registration
       setFormData({
         name: '',
@@ -271,7 +296,7 @@ const PatientRegistration = () => {
               </div>
             </div>
           </div>
-          
+
           <div className="bg-white/10 backdrop-blur-sm rounded-xl p-5 border border-white/20">
             <div className="flex items-center">
               <div className="p-3 bg-white/20 rounded-lg mr-4">
@@ -283,7 +308,7 @@ const PatientRegistration = () => {
               </div>
             </div>
           </div>
-          
+
           <div className="bg-white/10 backdrop-blur-sm rounded-xl p-5 border border-white/20">
             <div className="flex items-center">
               <div className="p-3 bg-white/20 rounded-lg mr-4">
@@ -295,7 +320,7 @@ const PatientRegistration = () => {
               </div>
             </div>
           </div>
-          
+
           <div className="bg-white/10 backdrop-blur-sm rounded-xl p-5 border border-white/20">
             <div className="flex items-center">
               <div className="p-3 bg-white/20 rounded-lg mr-4">
@@ -320,7 +345,7 @@ const PatientRegistration = () => {
               <User className="mr-3 text-blue-600" size={24} />
               Patient Information
             </h2>
-            
+
             {/* Search Patients Section */}
             <div className="flex items-center space-x-2">
               <div className="relative">
@@ -349,10 +374,15 @@ const PatientRegistration = () => {
               </button>
               <button
                 type="button"
-                onClick={() => setShowPatientList(!showPatientList)}
-                className="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors flex items-center"
+                onClick={handleShowAllPatients}
+                disabled={isSearching}
+                className="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors flex items-center disabled:opacity-50"
               >
-                <Users size={18} className="mr-2" />
+                {isSearching ? (
+                  <Loader2 className="animate-spin mr-2" size={18} />
+                ) : (
+                  <Users size={18} className="mr-2" />
+                )}
                 {showPatientList ? 'Hide List' : 'Show All'}
               </button>
             </div>
@@ -366,7 +396,7 @@ const PatientRegistration = () => {
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-900 flex items-center">
                   <Users className="mr-2" size={20} />
-                  Patient Search Results
+                  {searchTerm ? 'Search Results' : 'All Patients'}
                 </h3>
                 <button
                   onClick={() => setShowPatientList(false)}
@@ -375,11 +405,11 @@ const PatientRegistration = () => {
                   <X size={20} />
                 </button>
               </div>
-              
+
               {patients.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   <Users className="mx-auto mb-3" size={40} />
-                  <p>No patients found. Try a different search term.</p>
+                  <p>No patients found. {searchTerm ? 'Try a different search term.' : 'No patients in the system yet.'}</p>
                 </div>
               ) : (
                 <div className="space-y-3 max-h-64 overflow-y-auto">
@@ -482,7 +512,7 @@ const PatientRegistration = () => {
               <User className="mr-2 text-purple-600" size={20} />
               Basic Information
             </h3>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-900">
@@ -500,7 +530,7 @@ const PatientRegistration = () => {
                   />
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-900">
                   Age *
@@ -514,7 +544,7 @@ const PatientRegistration = () => {
                   required
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-900">
                   Gender *
@@ -534,7 +564,7 @@ const PatientRegistration = () => {
                   ))}
                 </div>
               </div>
-              
+
               <div className="md:col-span-3 space-y-2">
                 <label className="block text-sm font-medium text-gray-900">
                   Complaint (C/O) *
@@ -557,7 +587,7 @@ const PatientRegistration = () => {
               <MapPin className="mr-2 text-green-600" size={20} />
               Address Information
             </h3>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-900 flex items-center">
@@ -572,7 +602,7 @@ const PatientRegistration = () => {
                   placeholder="House number"
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-900">
                   Street
@@ -585,7 +615,7 @@ const PatientRegistration = () => {
                   placeholder="Street name"
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-900">
                   Place *
@@ -608,7 +638,7 @@ const PatientRegistration = () => {
               <Phone className="mr-2 text-blue-600" size={20} />
               Contact & Medical Information
             </h3>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-900">
@@ -626,7 +656,7 @@ const PatientRegistration = () => {
                   />
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-900">
                   Consulting Doctor *
@@ -645,7 +675,7 @@ const PatientRegistration = () => {
                   ))}
                 </select>
               </div>
-              
+
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-900">
                   Referred By
@@ -658,7 +688,7 @@ const PatientRegistration = () => {
                   placeholder="Referring doctor/clinic"
                 />
               </div>
-              
+
               {isIP && (
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-gray-900">
@@ -684,10 +714,12 @@ const PatientRegistration = () => {
                   Using data from existing patient: {selectedPatient.name}
                 </span>
               ) : (
-                'Logged in as: <span className="font-semibold text-gray-900">Hospital Staff</span>'
+                <>
+                  Logged in as: <span className="font-semibold text-gray-900">Hospital Staff</span>
+                </>
               )}
             </div>
-            
+
             <div className="flex flex-wrap gap-3">
               <button
                 type="button"
@@ -697,7 +729,7 @@ const PatientRegistration = () => {
                 <Trash2 size={18} className="mr-2" />
                 Clear Form
               </button>
-              
+
               <button
                 type="button"
                 onClick={() => navigate('/dashboard')}
@@ -706,7 +738,7 @@ const PatientRegistration = () => {
                 <X size={18} className="mr-2" />
                 Cancel
               </button>
-              
+
               <button
                 type="submit"
                 disabled={isLoading}
