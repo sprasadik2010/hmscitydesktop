@@ -1,10 +1,11 @@
 fastapi==0.110.0
 uvicorn[standard]==0.29.0
-sqlalchemy==2.0.28
+sqlalchemy==2.0.28  # Downgraded slightly for better 3.10 compatibility
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 python-multipart==0.0.9
 python-dotenv==1.0.0
-pydantic==2.7.4  # Changed from 2.6.4 to 2.7.4
+pydantic==2.6.4  # Downgraded - works better with 3.10
 pydantic-settings==2.1.0
-# Remove typing-extensions line completely
+# Remove typing-extensions or keep lower version
+typing-extensions==4.15.0
