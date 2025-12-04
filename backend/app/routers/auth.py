@@ -31,7 +31,7 @@ def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 def authenticate_user(db: Session, username: str, password: str):
-    user = db.query(User).filter(User.username == username).first()
+    user = db.query(User).filter(User.username.trim().toLowerCase() == username.trim().toLowerCase()).first()
     if not user:
         return False
     if not verify_password(password, user.password):
