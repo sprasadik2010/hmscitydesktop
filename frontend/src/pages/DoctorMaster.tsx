@@ -51,7 +51,7 @@ const DoctorMaster = () => {
     is_discontinued: false,
     resignation_date: ''
   })
-  
+
   const [isEditing, setIsEditing] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
@@ -80,17 +80,17 @@ const DoctorMaster = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!formData.code || !formData.name || !formData.specialty || !formData.department) {
       toast.error('Please fill required fields')
       return
     }
-    
+
     setIsLoading(true)
-    
+
     try {
       console.log('Current token:', localStorage.getItem('token'))
-      
+
       if (isEditing && formData.id) {
         await axios.put(`/doctors/${formData.id}`, formData)
         toast.success('Doctor updated successfully')
@@ -101,7 +101,7 @@ const DoctorMaster = () => {
         })
         toast.success('Doctor added successfully')
       }
-      
+
       resetForm()
       fetchDoctors()
       setShowForm(false)
@@ -125,7 +125,7 @@ const DoctorMaster = () => {
 
   const handleDelete = async (id: number) => {
     if (!window.confirm('Are you sure you want to delete this doctor?')) return
-    
+
     try {
       await axios.delete(`/doctors/${id}`)
       toast.success('Doctor deleted successfully')
@@ -189,13 +189,18 @@ const DoctorMaster = () => {
               setShowForm(true)
               window.scrollTo({ top: 0, behavior: 'smooth' })
             }}
-            className="btn-primary flex items-center bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md"
+            className="
+    flex items-center
+    bg-gradient-to-r from-blue-600 to-indigo-600
+    hover:from-blue-700 hover:to-indigo-700
+    text-white p-2 rounded-lg shadow-md
+  "
           >
             <Plus size={20} className="mr-2" />
             Add New Doctor
           </button>
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
             <div className="flex items-center">
@@ -208,7 +213,7 @@ const DoctorMaster = () => {
               </div>
             </div>
           </div>
-          
+
           <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
             <div className="flex items-center">
               <div className="p-2 bg-blue-100 rounded-lg mr-3">
@@ -222,7 +227,7 @@ const DoctorMaster = () => {
               </div>
             </div>
           </div>
-          
+
           <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
             <div className="flex items-center">
               <div className="p-2 bg-yellow-100 rounded-lg mr-3">
@@ -236,7 +241,7 @@ const DoctorMaster = () => {
               </div>
             </div>
           </div>
-          
+
           <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
             <div className="flex items-center">
               <div className="p-2 bg-purple-100 rounded-lg mr-3">
@@ -296,7 +301,7 @@ const DoctorMaster = () => {
                     required
                   />
                 </div>
-                
+
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-gray-900">
                     Name *
@@ -310,7 +315,7 @@ const DoctorMaster = () => {
                     required
                   />
                 </div>
-                
+
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-gray-900">
                     Qualification
@@ -346,7 +351,7 @@ const DoctorMaster = () => {
                     required
                   />
                 </div>
-                
+
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-gray-900">
                     Department *
@@ -391,7 +396,7 @@ const DoctorMaster = () => {
                     placeholder="9876543210"
                   />
                 </div>
-                
+
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-gray-900">
                     Email
@@ -404,7 +409,7 @@ const DoctorMaster = () => {
                     placeholder="doctor@hospital.com"
                   />
                 </div>
-                
+
                 <div className="md:col-span-2 space-y-2">
                   <label className="block text-sm font-medium text-gray-900">
                     Address
@@ -438,7 +443,7 @@ const DoctorMaster = () => {
                     className="input-field border-gray-300 focus:border-orange-500 focus:ring-orange-500"
                   />
                 </div>
-                
+
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-gray-900">
                     To Time
@@ -450,7 +455,7 @@ const DoctorMaster = () => {
                     className="input-field border-gray-300 focus:border-orange-500 focus:ring-orange-500"
                   />
                 </div>
-                
+
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-gray-900">
                     OP Validity (days)
@@ -462,7 +467,7 @@ const DoctorMaster = () => {
                     className="input-field border-gray-300 focus:border-orange-500 focus:ring-orange-500"
                   />
                 </div>
-                
+
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-gray-900">
                     Max Tokens/Day
@@ -474,7 +479,7 @@ const DoctorMaster = () => {
                     className="input-field border-gray-300 focus:border-orange-500 focus:ring-orange-500"
                   />
                 </div>
-                
+
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-gray-900">
                     Booking Code
@@ -509,7 +514,7 @@ const DoctorMaster = () => {
                     className="input-field border-gray-300 focus:border-yellow-500 focus:ring-yellow-500"
                   />
                 </div>
-                
+
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-gray-900">
                     Hospital Amount
@@ -522,7 +527,7 @@ const DoctorMaster = () => {
                     className="input-field border-gray-300 focus:border-yellow-500 focus:ring-yellow-500"
                   />
                 </div>
-                
+
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-gray-900">
                     Doctor Revisit
@@ -535,7 +540,7 @@ const DoctorMaster = () => {
                     className="input-field border-gray-300 focus:border-yellow-500 focus:ring-yellow-500"
                   />
                 </div>
-                
+
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-gray-900">
                     Hospital Revisit
@@ -572,7 +577,7 @@ const DoctorMaster = () => {
                     <p className="text-sm text-gray-500">Doctor has left the hospital</p>
                   </div>
                 </label>
-                
+
                 <label className="flex items-center space-x-3">
                   <div className="relative">
                     <input
@@ -587,7 +592,7 @@ const DoctorMaster = () => {
                     <p className="text-sm text-gray-500">Temporarily not practicing</p>
                   </div>
                 </label>
-                
+
                 {formData.is_resigned && (
                   <div className="w-full space-y-2">
                     <label className="block text-sm font-medium text-gray-900">
@@ -638,7 +643,7 @@ const DoctorMaster = () => {
               Total: <span className="text-blue-600">{filteredDoctors.length}</span> doctors
             </div>
           </div>
-          
+
           {/* Search Bar */}
           <div className="relative">
             <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
@@ -738,13 +743,12 @@ const DoctorMaster = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                        doctor.is_resigned 
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${doctor.is_resigned
                           ? 'bg-red-100 text-red-800'
                           : doctor.is_discontinued
                             ? 'bg-yellow-100 text-yellow-800'
                             : 'bg-green-100 text-green-800'
-                      }`}>
+                        }`}>
                         {doctor.is_resigned ? 'Resigned' : doctor.is_discontinued ? 'Discontinued' : 'Active'}
                       </span>
                     </td>
