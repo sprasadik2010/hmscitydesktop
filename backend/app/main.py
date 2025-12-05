@@ -44,6 +44,17 @@ async def root():
         "modules": ["OP/IP Registration", "Billing", "Doctor Master", "Reports"]
     }
 
+# ✅ ADD THIS HEALTH ENDPOINT FOR GITHUB ACTIONS
+@app.get("/api/health")
+async def health_check():
+    return {
+        "status": "healthy",
+        "timestamp": datetime.utcnow().isoformat(),
+        "service": "City Hospital Management System API",
+        "environment": os.getenv("ENVIRONMENT", "production"),
+        "version": "1.0.0"
+    }
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
