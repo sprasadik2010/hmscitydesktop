@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
-import { Save, X, Search, Trash2, User, Phone, MapPin, CalendarClock, Building, FileText, UserCheck, Home, Clock, Users, Eye, Loader2 } from 'lucide-react'
+import { Save, X, Search, Trash2, User, Phone, MapPin, CalendarClock, Building, FileText, UserCheck, Home, Clock, Users, Eye, Loader2, Bed, Stethoscope } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
 
@@ -41,7 +41,7 @@ interface PatientFormData {
 }
 
 const PatientRegistration = () => {
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const type = searchParams.get('type') || 'op'
   const isIP = type === 'ip'
@@ -69,12 +69,42 @@ const PatientRegistration = () => {
   const [patients, setPatients] = useState<Patient[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
+  const [patientNumber, setPatientNumber] = useState<string>('')
 
   useEffect(() => {
     fetchDoctors()
     const timer = setInterval(() => setCurrentTime(new Date()), 1000)
+    generateNewPatientNumber()
     return () => clearInterval(timer)
   }, [])
+
+  useEffect(() => {
+    setFormData(prev => ({
+      ...prev,
+      is_ip: isIP,
+      room: isIP ? prev.room : ''
+    }))
+    
+    generateNewPatientNumber()
+    setSelectedPatient(null)
+    setShowPatientList(false)
+    setPatients([])
+    
+    toast.success(`Switched to ${isIP ? 'IP' : 'OP'} registration`)
+  }, [isIP])
+
+  const generatePatientNumber = (): string => {
+    const now = new Date()
+    const yearMonth = format(now, 'yyyyMM')
+    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
+    return isIP
+      ? `IP-${yearMonth}-${Math.floor(Math.random() * 1000000).toString().padStart(6, '0')}`
+      : `OP-${yearMonth}-${random}`
+  }
+
+  const generateNewPatientNumber = () => {
+    setPatientNumber(generatePatientNumber())
+  }
 
   const fetchDoctors = async () => {
     try {
@@ -86,6 +116,11 @@ const PatientRegistration = () => {
     } catch (error) {
       toast.error('Failed to load doctors')
     }
+  }
+
+  const toggleRegistrationType = () => {
+    const newType = isIP ? 'op' : 'ip'
+    setSearchParams({ type: newType })
   }
 
   const fetchAllPatients = async () => {
@@ -109,39 +144,28 @@ const PatientRegistration = () => {
   const handleShowAllPatients = async () => {
     console.log('Show All button clicked, showPatientList:', showPatientList)
     if (showPatientList) {
-      // If already showing, hide it
       setShowPatientList(false)
     } else {
-      // If not showing, fetch all patients
       await fetchAllPatients()
     }
-  }
-
-  const generatePatientNumber = () => {
-    const now = new Date()
-    const yearMonth = format(now, 'yyyyMM')
-    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
-    return isIP
-      ? `IP-${yearMonth}-${Math.floor(Math.random() * 1000000).toString().padStart(6, '0')}`
-      : `OP-${yearMonth}-${random}`
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Validation
     if (!formData.name || !formData.age || !formData.gender || !formData.complaint || !formData.phone || !formData.doctor_id) {
       toast.error('Please fill required fields')
+      return
+    }
+
+    if (isIP && !formData.room) {
+      toast.error('Room/Ward is required for inpatient registration')
       return
     }
 
     setIsLoading(true)
 
     try {
-      // Generate patient number
-      const patientNumber = generatePatientNumber()
-
-      // Prepare data for API
       const patientData = {
         ...formData,
         patient_number: patientNumber,
@@ -151,12 +175,10 @@ const PatientRegistration = () => {
 
       console.log('Submitting patient data:', patientData)
 
-      // Call your patient registration API endpoint
       await axios.post('/patients', patientData)
 
       toast.success(`Patient registered successfully! ${isIP ? 'IP' : 'OP'} Number: ${patientNumber}`)
 
-      // Reset form after successful registration
       setFormData({
         name: '',
         age: '',
@@ -173,8 +195,8 @@ const PatientRegistration = () => {
       })
       setSearchTerm('')
       setSelectedPatient(null)
+      generateNewPatientNumber()
 
-      // Optionally navigate to dashboard after 2 seconds
       setTimeout(() => {
         navigate('/dashboard')
       }, 2000)
@@ -256,6 +278,7 @@ const PatientRegistration = () => {
       setSelectedPatient(null)
       setPatients([])
       setShowPatientList(false)
+      generateNewPatientNumber()
       toast.success('Form cleared successfully')
     }
   }
@@ -268,7 +291,7 @@ const PatientRegistration = () => {
     <div className="max-w-6xl mx-auto space-y-6">
       {/* Header */}
       <div className={`bg-gradient-to-r rounded-2xl p-8 shadow-xl ${isIP ? 'from-purple-600 to-indigo-700' : 'from-blue-600 to-cyan-700'}`}>
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
           <div>
             <h1 className="text-3xl font-bold text-white flex items-center">
               <Building className="mr-3" size={32} />
@@ -278,13 +301,35 @@ const PatientRegistration = () => {
               {isIP ? 'Register new inpatient admissions' : 'Register new outpatient consultations'}
             </p>
           </div>
-          <button
-            onClick={() => navigate('/dashboard')}
-            className="bg-white/20 backdrop-blur-sm text-white px-6 py-3 rounded-xl hover:bg-white/30 transition-colors flex items-center"
-          >
-            <X size={20} className="mr-2" />
-            Back to Dashboard
-          </button>
+          
+          <div className="flex flex-col sm:flex-row items-center gap-4">
+            <button
+              onClick={toggleRegistrationType}
+              className={`flex items-center justify-center px-6 py-3 rounded-xl font-medium transition-all shadow-lg ${isIP 
+                ? 'bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white' 
+                : 'bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white'}`}
+            >
+              {isIP ? (
+                <>
+                  <Stethoscope size={20} className="mr-2" />
+                  Switch to OP Registration
+                </>
+              ) : (
+                <>
+                  <Bed size={20} className="mr-2" />
+                  Switch to IP Registration
+                </>
+              )}
+            </button>
+            
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="bg-white/20 backdrop-blur-sm text-white px-6 py-3 rounded-xl hover:bg-white/30 transition-colors flex items-center"
+            >
+              <X size={20} className="mr-2" />
+              Back to Dashboard
+            </button>
+          </div>
         </div>
 
         {/* Registration Header Info */}
@@ -296,7 +341,7 @@ const PatientRegistration = () => {
               </div>
               <div>
                 <p className="text-white/80 text-sm">{isIP ? 'IP Number' : 'OP Number'}</p>
-                <p className="text-2xl font-bold text-white mt-1">{generatePatientNumber()}</p>
+                <p className="text-2xl font-bold text-white mt-1">{patientNumber}</p>
               </div>
             </div>
           </div>
@@ -327,12 +372,12 @@ const PatientRegistration = () => {
 
           <div className="bg-white/10 backdrop-blur-sm rounded-xl p-5 border border-white/20">
             <div className="flex items-center">
-              <div className="p-3 bg-white/20 rounded-lg mr-4">
+              <div className={`p-3 ${isIP ? 'bg-purple-500' : 'bg-blue-500'} rounded-lg mr-4`}>
                 <UserCheck className="text-white" size={24} />
               </div>
               <div>
                 <p className="text-white/80 text-sm">Registration Type</p>
-                <p className="text-lg font-bold text-white mt-1">
+                <p className={`text-lg font-bold ${isIP ? 'text-purple-200' : 'text-blue-200'} mt-1`}>
                   {isIP ? 'INPATIENT' : 'OUTPATIENT'}
                 </p>
               </div>
@@ -699,7 +744,7 @@ const PatientRegistration = () => {
               {isIP && (
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-gray-900">
-                    Room/Ward
+                    Room/Ward *
                   </label>
                   <input
                     type="text"
@@ -707,6 +752,7 @@ const PatientRegistration = () => {
                     onChange={(e) => setFormData({ ...formData, room: e.target.value })}
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="e.g., ICU-101, Ward-2A"
+                    required={isIP}
                   />
                 </div>
               )}

@@ -393,7 +393,7 @@ const DoctorMaster = () => {
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     className="input-field border-gray-300 focus:border-purple-500 focus:ring-purple-500"
-                    placeholder="9876543210"
+                    placeholder="10-digit mobile number"
                   />
                 </div>
 
