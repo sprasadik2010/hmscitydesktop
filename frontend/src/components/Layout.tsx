@@ -3,27 +3,27 @@ import { useAuth } from '../contexts/AuthContext'
 import { 
   Home, 
   // Users, 
-  UserPlus, 
+  // UserPlus, 
   Stethoscope, 
   FileText, 
   ClipboardList,
   LogOut,
-  Menu,
+  // Menu,
   X,
   Building,
   BarChart3,
-  Calendar,
-  Settings,
-  Bell,
+  // Calendar,
+  // Settings,
+  // Bell,
   ChevronRight,
-  ChevronLeft,
-  HelpCircle,
-  Shield,
+  // ChevronLeft,
+  // HelpCircle,
+  // Shield,
   // CreditCard
 } from 'lucide-react'
 import { useState } from 'react'
 import toast from 'react-hot-toast'
-import { format } from 'date-fns'
+// import { format } from 'date-fns'
 
 const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
   const { user, logout } = useAuth()
@@ -94,12 +94,12 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
     setIsSidebarOpen(true)
   }
 
-  const getGreeting = () => {
-    const hour = new Date().getHours()
-    if (hour < 12) return 'Good Morning'
-    if (hour < 18) return 'Good Afternoon'
-    return 'Good Evening'
-  }
+  // const getGreeting = () => {
+  //   const hour = new Date().getHours()
+  //   if (hour < 12) return 'Good Morning'
+  //   if (hour < 18) return 'Good Afternoon'
+  //   return 'Good Evening'
+  // }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex">

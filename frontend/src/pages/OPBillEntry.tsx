@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
-import { Save, Trash2, X, Printer, Search, Building, CalendarClock, User, Phone, Mail, Home, MapPin, Bed, IndianRupee, Eye, Loader2, Users, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react'
+import { /* Save, Trash2, */ X, /* Printer, */ Search, Building, CalendarClock, User, /* Phone, Mail, Home, MapPin, Bed, IndianRupee, Eye, */ Loader2, Users, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
 
