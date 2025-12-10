@@ -7,7 +7,7 @@ export default defineConfig(({ mode }) => {
 
   // Detect if running inside Tauri
   const isTauri = process.env.TAURI === 'true'
-  const backendUrl = isTauri ? 'http://127.0.0.1:8000' : env.VITE_BACKEND_URL || 'https://hmscity.onrender.com'
+  const backendUrl = isTauri ? 'http://127.0.0.1:8000' : env.VITE_BACKEND_URL || 'http://127.0.0.1:8000'
 
   console.log(`🚀 Using backend URL: ${backendUrl}`)
 

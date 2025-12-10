@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 
 // Get backend URL from environment variable
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://hmscity.onrender.com'
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://127.0.0.1:8000'
 
 // Set axios base URL from environment variable
 axios.defaults.baseURL = BACKEND_URL

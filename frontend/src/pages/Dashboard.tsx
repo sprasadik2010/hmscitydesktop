@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import axios from 'axios'
 import { 
   Users, 
-  UserPlus, 
+  // UserPlus, 
   FileText, 
   ClipboardList, 
   Calendar,
@@ -50,22 +50,22 @@ const Dashboard = () => {
   }
 
   const quickActions = [
-    {
-      title: 'OP Registration',
-      description: 'Register new outpatient',
-      icon: UserPlus,
-      color: 'bg-gradient-to-br from-blue-500 to-blue-600',
-      gradient: 'from-blue-50 to-blue-100',
-      action: () => navigate('/patient/registration?type=op')
-    },
-    {
-      title: 'IP Registration',
-      description: 'Register new inpatient',
-      icon: Users,
-      color: 'bg-gradient-to-br from-purple-500 to-purple-600',
-      gradient: 'from-purple-50 to-purple-100',
-      action: () => navigate('/patient/registration?type=ip')
-    },
+    // {
+    //   title: 'OP Registration',
+    //   description: 'Register new outpatient',
+    //   icon: UserPlus,
+    //   color: 'bg-gradient-to-br from-blue-500 to-blue-600',
+    //   gradient: 'from-blue-50 to-blue-100',
+    //   action: () => navigate('/patient/registration?type=op')
+    // },
+    // {
+    //   title: 'IP Registration',
+    //   description: 'Register new inpatient',
+    //   icon: Users,
+    //   color: 'bg-gradient-to-br from-purple-500 to-purple-600',
+    //   gradient: 'from-purple-50 to-purple-100',
+    //   action: () => navigate('/patient/registration?type=ip')
+    // },
     {
       title: 'OP Billing',
       description: 'Create OP consultation bill',

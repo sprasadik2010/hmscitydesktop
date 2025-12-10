@@ -15,7 +15,7 @@ jobs:
           echo "🚀 Checking City Hospital Backend at $(date)"
           
           # Your BACKEND URL (hmscity, not citynh)
-          BACKEND_URL="https://hmscity.onrender.com/api/health"
+          BACKEND_URL="http://127.0.0.1:8000/api/health"
           
           echo "📡 Backend URL: $BACKEND_URL"
           
