@@ -2,19 +2,13 @@ import { useState, useEffect } from 'react'
 import axios from 'axios'
 import { 
   Users, 
-  // UserPlus, 
   FileText, 
   ClipboardList, 
-  Calendar,
   TrendingUp,
   Stethoscope,
   Hospital,
   Clock,
   Activity,
-  ShieldCheck,
-  Database,
-  Server,
-  Printer,
   ArrowRight,
   HeartPulse
 } from 'lucide-react'
@@ -26,7 +20,6 @@ interface DashboardStats {
   total_op_bills_today: number
   total_ip_bills_today: number
   total_revenue_today: number
-  pending_appointments: number
 }
 
 const Dashboard = () => {
@@ -97,44 +90,6 @@ const Dashboard = () => {
       color: 'bg-gradient-to-br from-indigo-500 to-indigo-600',
       gradient: 'from-indigo-50 to-indigo-100',
       action: () => navigate('/reports')
-    }
-  ]
-
-  const systemStatus = [
-    {
-      label: 'Database',
-      status: 'Online',
-      icon: Database,
-      color: 'text-green-600',
-      bgColor: 'bg-green-100'
-    },
-    {
-      label: 'API Server',
-      status: 'Running',
-      icon: Server,
-      color: 'text-green-600',
-      bgColor: 'bg-green-100'
-    },
-    {
-      label: 'Authentication',
-      status: 'Active',
-      icon: ShieldCheck,
-      color: 'text-green-600',
-      bgColor: 'bg-green-100'
-    },
-    {
-      label: 'Print Service',
-      status: 'Ready',
-      icon: Printer,
-      color: 'text-green-600',
-      bgColor: 'bg-green-100'
-    },
-    {
-      label: 'Backup System',
-      status: 'Scheduled',
-      icon: Activity,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-100'
     }
   ]
 
@@ -242,7 +197,7 @@ const Dashboard = () => {
             <p className="text-gray-600 mt-1">Frequently used functions for daily operations</p>
           </div>
           <div className="text-sm text-gray-500">
-            6 modules available
+            4 modules available
           </div>
         </div>
         
@@ -271,98 +226,6 @@ const Dashboard = () => {
               </button>
             )
           })}
-        </div>
-      </div>
-
-      {/* Bottom Section - Pending Appointments & System Status */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Pending Appointments Card */}
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
-          <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50">
-            <h2 className="text-xl font-bold text-gray-900 flex items-center">
-              <Calendar className="mr-3 text-green-600" size={24} />
-              Pending Appointments
-            </h2>
-          </div>
-          <div className="p-8">
-            <div className="text-center">
-              <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-green-100 to-emerald-100 rounded-full mb-6">
-                <Calendar className="text-green-600" size={40} />
-              </div>
-              <p className="text-5xl font-bold text-gray-900 mb-2">{stats?.pending_appointments || 0}</p>
-              <p className="text-gray-600 text-lg">Appointments pending for today</p>
-              
-              <div className="mt-8 grid grid-cols-2 gap-4">
-                <div className="bg-blue-50 rounded-lg p-4">
-                  <div className="text-sm text-gray-600">Morning</div>
-                  <div className="text-2xl font-bold text-gray-900">
-                    {Math.floor((stats?.pending_appointments || 0) * 0.6)}
-                  </div>
-                </div>
-                <div className="bg-orange-50 rounded-lg p-4">
-                  <div className="text-sm text-gray-600">Evening</div>
-                  <div className="text-2xl font-bold text-gray-900">
-                    {Math.floor((stats?.pending_appointments || 0) * 0.4)}
-                  </div>
-                </div>
-              </div>
-              
-              <button
-                onClick={() => navigate('/reports?tab=appointments')}
-                className="mt-8 w-full py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-medium rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all shadow-md"
-              >
-                View All Appointments
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* System Status Card */}
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
-          <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-blue-50">
-            <h2 className="text-xl font-bold text-gray-900 flex items-center">
-              <ShieldCheck className="mr-3 text-blue-600" size={24} />
-              System Status
-            </h2>
-          </div>
-          <div className="p-6">
-            <div className="space-y-4">
-              {systemStatus.map((item, index) => {
-                const Icon = item.icon
-                return (
-                  <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
-                    <div className="flex items-center">
-                      <div className={`p-2 rounded-lg ${item.bgColor} mr-4`}>
-                        <Icon className={item.color} size={20} />
-                      </div>
-                      <div>
-                        <div className="font-medium text-gray-900">{item.label}</div>
-                        <div className="text-sm text-gray-500">Real-time monitoring</div>
-                      </div>
-                    </div>
-                    <span className={`px-3 py-1 text-sm font-medium rounded-full ${item.bgColor} ${item.color}`}>
-                      {item.status}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-            
-            <div className="mt-8 pt-6 border-t border-gray-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-sm text-gray-600">System Uptime</div>
-                  <div className="text-2xl font-bold text-gray-900">99.8%</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm text-gray-600">Last Updated</div>
-                  <div className="text-sm font-medium text-gray-900">
-                    {new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 

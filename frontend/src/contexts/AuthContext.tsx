@@ -43,6 +43,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true)
   const navigate = useNavigate()
 
+  // Add response interceptor for 401 errors
+  useEffect(() => {
+    const interceptor = axios.interceptors.response.use(
+      response => response,
+      error => {
+        if (error.response?.status === 401 && token) {
+          // Token expired - logout user
+          console.log('Token expired, logging out...')
+          handleAutoLogout()
+        }
+        return Promise.reject(error)
+      }
+    )
+
+    return () => {
+      axios.interceptors.response.eject(interceptor)
+    }
+  }, [token, navigate])
+
   useEffect(() => {
     if (token) {
       // Set Authorization header for ALL axios requests
@@ -53,18 +72,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [token])
 
+  const handleAutoLogout = () => {
+    localStorage.removeItem('token')
+    setToken(null)
+    setUser(null)
+    delete axios.defaults.headers.common['Authorization']
+    
+    // Use window.location instead of navigate for guaranteed redirect
+    if (window.location.pathname !== '/login') {
+      toast.error('Session expired. Please login again.')
+      window.location.href = '/login'
+    }
+  }
+
   const verifyToken = async () => {
     try {
-      // Test the token by making an API call
-      await axios.get('/dashboard/stats')
+      // Use a lightweight endpoint instead of /dashboard/stats
+      await axios.get('/auth/me', {
+        timeout: 5000 // 5 second timeout
+      })
       setIsLoading(false)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Token verification failed:', error)
-      localStorage.removeItem('token')
-      setToken(null)
-      setUser(null)
-      setIsLoading(false)
-      navigate('/login')
+      
+      // Only logout if it's an auth error (401)
+      if (error.response?.status === 401) {
+        handleAutoLogout()
+      } else {
+        // Network or server error - don't logout
+        setIsLoading(false)
+      }
     }
   }
 
@@ -78,8 +115,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       const { access_token, user: userData } = response.data
       
-      // Save token
+      // Save token with expiration tracking
       localStorage.setItem('token', access_token)
+      localStorage.setItem('login_time', Date.now().toString())
+      
       setToken(access_token)
       setUser(userData)
       
@@ -89,17 +128,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       toast.success('Login successful!')
       navigate('/dashboard')
     } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Login failed')
+      console.error("Login error:", error)
+
+      const backendMessage =
+        error.response?.data?.detail ||
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        JSON.stringify(error.response?.data) ||
+        error.message
+
+      toast.error(backendMessage)
       throw error
     }
   }
 
   const logout = () => {
     localStorage.removeItem('token')
+    localStorage.removeItem('login_time')
     setToken(null)
     setUser(null)
     delete axios.defaults.headers.common['Authorization']
-    navigate('/login')
+    
+    // Use window.location for reliable redirect
+    window.location.href = '/login'
     toast.success('Logged out successfully')
   }
 

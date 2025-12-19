@@ -5,6 +5,8 @@ edition = "2021"
 
 [dependencies]
 tauri = { version = "2.0", features = [] }
+chrono = "0.4"  # Add this line for timestamps
+dirs = "5.0" # Add this line for accessing standard OS directories
 
 [build-dependencies]
 tauri-build = { version = "2.0", features = [] }

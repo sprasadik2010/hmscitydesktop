@@ -1,7 +1,15 @@
+import sys
+import os
+from pathlib import Path
 from sqlalchemy.orm import Session
-from database import SessionLocal, engine
-from models import Base, User, Doctor
-from auth import get_password_hash
+
+# Add the parent directory to Python path so we can import correctly
+current_dir = Path(__file__).parent
+sys.path.insert(0, str(current_dir))
+
+from database import SessionLocal, engine, create_tables
+from app.models.models import Base, User, Doctor
+from app.auth import get_password_hash
 
 def create_admin_user():
     db = SessionLocal()
@@ -17,8 +25,10 @@ def create_admin_user():
             )
             db.add(admin_user)
             db.commit()
-            print("Admin user created: admin/admin123")
-        
+            print("✓ Admin user created: admin/admin123")
+        else:
+            print("✓ Admin user already exists")
+
         # Create sample doctors
         doctors = [
             Doctor(
@@ -80,21 +90,44 @@ def create_admin_user():
             )
         ]
         
+        doctors_created = 0
         for doctor in doctors:
             existing = db.query(Doctor).filter(Doctor.code == doctor.code).first()
             if not existing:
                 db.add(doctor)
+                doctors_created += 1
         
         db.commit()
-        print("Sample doctors created")
+        if doctors_created > 0:
+            print(f"✓ Created {doctors_created} sample doctors")
+        else:
+            print("✓ Sample doctors already exist")
         
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"✗ Error seeding data: {e}")
+        db.rollback()
+        raise
     finally:
         db.close()
 
-if __name__ == "__main__":
+def init_database():
+    """Initialize database with tables and seed data"""
+    print("=" * 50)
+    print("Initializing HMS Database")
+    print("=" * 50)
+    
     # Create tables
-    Base.metadata.create_all(bind=engine)
+    print("\n1. Creating database tables...")
+    create_tables()
+    print("   ✓ Tables created successfully")
+    
     # Create admin user and sample data
+    print("\n2. Seeding initial data...")
     create_admin_user()
+    
+    print("\n" + "=" * 50)
+    print("Database initialization complete!")
+    print("=" * 50)
+
+if __name__ == "__main__":
+    init_database()

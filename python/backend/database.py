@@ -1,24 +1,23 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from backend.app.models.models import Base
+from .app.models.models import Base
 import os
-from pathlib import Path
 
-# Get the base directory (python folder)
-BASE_DIR = Path(__file__).resolve().parent.parent  # Goes up to python/ folder
+APP_DATA_DIR = os.path.join(
+    os.environ["LOCALAPPDATA"],
+    "HMSLite"
+)
 
-# Create data directory in python folder
-DATA_DIR = BASE_DIR / "data"
-os.makedirs(DATA_DIR, exist_ok=True)
+os.makedirs(APP_DATA_DIR, exist_ok=True)
 
-# Database path
-DATABASE_PATH = DATA_DIR / "hms_lite.db"
-SQLALCHEMY_DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
+db_path = os.path.join(APP_DATA_DIR, "hms_lite.db")
+
+SQLALCHEMY_DATABASE_URL = f"sqlite:///{db_path}"
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL, 
     connect_args={"check_same_thread": False},
-    echo=False  # Set to False for production (quieter logs)
+    echo=True  # Set to False in production
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

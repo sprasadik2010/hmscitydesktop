@@ -5,7 +5,7 @@ from datetime import datetime
 import os
 
 from backend.database import create_tables
-from .routers import auth, patients, doctors, bills, dashboard, reports
+from .routers import auth, patients, doctors, bills, dashboard, reports, seeder
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -21,9 +21,26 @@ app = FastAPI(
 )
 
 # Configure CORS
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=[
+#         "http://localhost:5173",      # React dev
+#         "https://citynh.onrender.com", # Deploy
+#         "tauri://localhost",          # Tauri desktop
+#         "app://localhost",
+#         "app://-",                    # Some webview runtimes
+#         "http://127.0.0.1:5173",
+#         "http://localhost",
+#         "http://127.0.0.1",
+#     ],
+#     allow_credentials=True,
+#     allow_methods=["*"],
+#     allow_headers=["*"],
+# )
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173","https://citynh.onrender.com"],  # Vite default port
+    allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -36,6 +53,7 @@ app.include_router(doctors.router)
 app.include_router(bills.router)
 app.include_router(dashboard.router)
 app.include_router(reports.router)
+app.include_router(seeder.router) 
 
 @app.get("/")
 async def root():
@@ -59,4 +77,4 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)

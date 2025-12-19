@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
-import { Save, X, Search, Trash2, User, Phone, MapPin, CalendarClock, Building, FileText, UserCheck, Home, Clock, Users, Eye, Loader2, Bed, Stethoscope } from 'lucide-react'
+import { Save, X, Search, Trash2, User, Phone, MapPin, /*CalendarClock,*/ Building, FileText, UserCheck, /*Home,*/ Clock, Users, Eye, Loader2, Bed, Stethoscope, Calendar, /*AlertCircle, FileEdit,*/ UserPlus } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
+import type { AxiosError } from 'axios'
 
 interface Doctor {
   id: number
@@ -43,7 +44,7 @@ interface PatientFormData {
 const PatientRegistration = () => {
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
-  const type = searchParams.get('type') || 'op'
+  const type = searchParams.get('type') || 'ip'
   const isIP = type === 'ip'
 
   const [formData, setFormData] = useState<PatientFormData>({
@@ -63,7 +64,7 @@ const PatientRegistration = () => {
 
   const [doctors, setDoctors] = useState<Doctor[]>([])
   const [isLoading, setIsLoading] = useState(false)
-  const [currentTime, setCurrentTime] = useState(new Date())
+  // const [currentTime, setCurrentTime] = useState(new Date())
   const [searchTerm, setSearchTerm] = useState('')
   const [showPatientList, setShowPatientList] = useState(false)
   const [patients, setPatients] = useState<Patient[]>([])
@@ -73,9 +74,9 @@ const PatientRegistration = () => {
 
   useEffect(() => {
     fetchDoctors()
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000)
+    // const timer = setInterval(() => setCurrentTime(new Date()), 1000)
     generateNewPatientNumber()
-    return () => clearInterval(timer)
+    // return () => clearInterval(timer)
   }, [])
 
   useEffect(() => {
@@ -89,8 +90,6 @@ const PatientRegistration = () => {
     setSelectedPatient(null)
     setShowPatientList(false)
     setPatients([])
-    
-    toast.success(`Switched to ${isIP ? 'IP' : 'OP'} registration`)
   }, [isIP])
 
   const generatePatientNumber = (): string => {
@@ -118,20 +117,17 @@ const PatientRegistration = () => {
     }
   }
 
-  const toggleRegistrationType = () => {
-    const newType = isIP ? 'op' : 'ip'
-    setSearchParams({ type: newType })
-  }
+  // const toggleRegistrationType = () => {
+  //   const newType = isIP ? 'op' : 'ip'
+  //   setSearchParams({ type: newType })
+  // }
 
   const fetchAllPatients = async () => {
-    console.log('Fetching all patients...')
     setIsSearching(true)
     try {
       const response = await axios.get('/patients')
-      console.log('All patients response:', response.data)
       setPatients(response.data)
       setShowPatientList(true)
-      toast.success(`Showing ${response.data.length} patients`)
     } catch (error: any) {
       console.error('Error fetching all patients:', error)
       toast.error('Failed to load patients')
@@ -142,7 +138,6 @@ const PatientRegistration = () => {
   }
 
   const handleShowAllPatients = async () => {
-    console.log('Show All button clicked, showPatientList:', showPatientList)
     if (showPatientList) {
       setShowPatientList(false)
     } else {
@@ -170,10 +165,9 @@ const PatientRegistration = () => {
         ...formData,
         patient_number: patientNumber,
         registration_date: format(new Date(), 'yyyy-MM-dd'),
-        registration_time: format(currentTime, 'HH:mm:ss')
-      }
+        registration_time: format(new Date(), 'HH:mm:ss')
 
-      console.log('Submitting patient data:', patientData)
+      }
 
       await axios.post('/patients', patientData)
 
@@ -231,11 +225,21 @@ const PatientRegistration = () => {
       setShowPatientList(true)
       toast.success(`Found ${response.data.length} patients`)
     } catch (error) {
-      toast.error('Failed to search patients')
-      setPatients([])
-    } finally {
-      setIsSearching(false)
-    }
+  const axiosError = error as AxiosError
+
+  if (axiosError.response) {
+    toast.error(`OP search failed: ${axiosError.response.status}`)
+  } else if (axiosError.request) {
+    toast.error('Network error - unable to connect to server')
+  } else {
+    toast.error('OP search failed: ' + axiosError.message)
+  }
+
+  setPatients([])
+  setIsSearching(false)
+} finally {
+  setIsSearching(false)
+}
   }
 
   const handleSelectPatient = (patient: Patient) => {
@@ -288,113 +292,117 @@ const PatientRegistration = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      {/* Header */}
-      <div className={`bg-gradient-to-r rounded-2xl p-8 shadow-xl ${isIP ? 'from-purple-600 to-indigo-700' : 'from-blue-600 to-cyan-700'}`}>
-        <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+    <div className="max-w-7xl mx-auto space-y-6">
+      {/* Header with Stats - Matching DoctorMaster */}
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
+        <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-3xl font-bold text-white flex items-center">
-              <Building className="mr-3" size={32} />
-              {isIP ? 'Inpatient (IP) Registration' : 'Outpatient (OP) Registration'}
+            <h1 className="text-2xl font-bold text-gray-900 flex items-center">
+              <UserPlus className="mr-3 text-blue-600" size={28} />
+              Patient Registration
             </h1>
-            <p className="text-white/80 mt-2 text-lg">
-              {isIP ? 'Register new inpatient admissions' : 'Register new outpatient consultations'}
-            </p>
+            <p className="text-gray-600 mt-1">Register new patients for outpatient or inpatient services</p>
           </div>
-          
-          <div className="flex flex-col sm:flex-row items-center gap-4">
-            <button
-              onClick={toggleRegistrationType}
-              className={`flex items-center justify-center px-6 py-3 rounded-xl font-medium transition-all shadow-lg ${isIP 
-                ? 'bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white' 
-                : 'bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white'}`}
-            >
-              {isIP ? (
-                <>
-                  <Stethoscope size={20} className="mr-2" />
-                  Switch to OP Registration
-                </>
-              ) : (
-                <>
-                  <Bed size={20} className="mr-2" />
-                  Switch to IP Registration
-                </>
-              )}
-            </button>
-            
-            <button
-              onClick={() => navigate('/dashboard')}
-              className="bg-white/20 backdrop-blur-sm text-white px-6 py-3 rounded-xl hover:bg-white/30 transition-colors flex items-center"
-            >
-              <X size={20} className="mr-2" />
-              Back to Dashboard
-            </button>
-          </div>
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="flex items-center bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg shadow-md"
+          >
+            <X size={20} className="mr-2" />
+            Back to Dashboard
+          </button>
         </div>
 
-        {/* Registration Header Info */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="bg-white/10 backdrop-blur-sm rounded-xl p-5 border border-white/20">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
             <div className="flex items-center">
-              <div className="p-3 bg-white/20 rounded-lg mr-4">
-                <FileText className="text-white" size={24} />
+              <div className="p-2 bg-blue-100 rounded-lg mr-3">
+                <FileText className="text-blue-600" size={20} />
               </div>
               <div>
-                <p className="text-white/80 text-sm">{isIP ? 'IP Number' : 'OP Number'}</p>
-                <p className="text-2xl font-bold text-white mt-1">{patientNumber}</p>
+                <p className="text-sm text-gray-600">{isIP ? 'IP Number' : 'OP Number'}</p>
+                <p className="text-2xl font-bold text-gray-900">{patientNumber}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white/10 backdrop-blur-sm rounded-xl p-5 border border-white/20">
+          <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
             <div className="flex items-center">
-              <div className="p-3 bg-white/20 rounded-lg mr-4">
-                <CalendarClock className="text-white" size={24} />
+              <div className="p-2 bg-green-100 rounded-lg mr-3">
+                <Calendar className="text-green-600" size={20} />
               </div>
               <div>
-                <p className="text-white/80 text-sm">Registration Date</p>
-                <p className="text-lg font-bold text-white mt-1">{format(new Date(), 'dd/MM/yyyy')}</p>
+                <p className="text-sm text-gray-600">Registration Date</p>
+                <p className="text-2xl font-bold text-gray-900">{format(new Date(), 'dd/MM/yyyy')}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white/10 backdrop-blur-sm rounded-xl p-5 border border-white/20">
+          <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
             <div className="flex items-center">
-              <div className="p-3 bg-white/20 rounded-lg mr-4">
-                <Clock className="text-white" size={24} />
+              <div className="p-2 bg-purple-100 rounded-lg mr-3">
+                <Clock className="text-purple-600" size={20} />
               </div>
               <div>
-                <p className="text-white/80 text-sm">Registration Time</p>
-                <p className="text-lg font-bold text-white mt-1">{format(currentTime, 'HH:mm:ss')}</p>
+                <p className="text-sm text-gray-600">Registration Time</p>
+                <p className="text-2xl font-bold text-gray-900">{format(new Date(), 'HH:mm:ss')}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white/10 backdrop-blur-sm rounded-xl p-5 border border-white/20">
+          <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
             <div className="flex items-center">
-              <div className={`p-3 ${isIP ? 'bg-purple-500' : 'bg-blue-500'} rounded-lg mr-4`}>
-                <UserCheck className="text-white" size={24} />
+              <div className="p-2 bg-indigo-100 rounded-lg mr-3">
+                <Building className="text-indigo-600" size={20} />
               </div>
               <div>
-                <p className="text-white/80 text-sm">Registration Type</p>
-                <p className={`text-lg font-bold ${isIP ? 'text-purple-200' : 'text-blue-200'} mt-1`}>
+                <p className="text-sm text-gray-600">Registration Type</p>
+                <p className="text-2xl font-bold text-gray-900">
                   {isIP ? 'INPATIENT' : 'OUTPATIENT'}
                 </p>
               </div>
             </div>
           </div>
         </div>
+
+        {/* Registration Type Toggle */}
+        <div className="mt-4 flex items-center justify-center">
+          <div className="bg-white rounded-lg p-2 inline-flex border border-gray-200">
+            <button
+              onClick={() => setSearchParams({ type: 'ip' })}
+              className={`px-4 py-2 rounded-md font-medium transition-colors ${isIP 
+                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-sm' 
+                : 'text-gray-700 hover:bg-gray-50'}`}
+            >
+              <Bed size={18} className="inline mr-2" />
+              Inpatient (IP)
+            </button>
+            <button
+              onClick={() => setSearchParams({ type: 'op' })}
+              className={`px-4 py-2 rounded-md font-medium transition-colors ${!isIP 
+                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm' 
+                : 'text-gray-700 hover:bg-gray-50'}`}
+            >
+              <Stethoscope size={18} className="inline mr-2" />
+              Outpatient (OP)
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* Main Form */}
-      <div className="bg-white rounded-2xl shadow-lg border border-gray-200">
-        <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-cyan-50">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <h2 className="text-xl font-bold text-gray-900 flex items-center">
-              <User className="mr-3 text-blue-600" size={24} />
-              Patient Information
-            </h2>
-
+      {/* Main Form Section - Matching DoctorMaster */}
+      <div className="bg-white rounded-xl shadow-lg border border-gray-200">
+        <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-white">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900 flex items-center">
+                <UserPlus className="mr-2 text-blue-600" size={24} />
+                Patient Information
+              </h2>
+              <p className="text-gray-600 mt-1">
+                Fill in the patient details for {isIP ? 'inpatient admission' : 'outpatient consultation'}
+              </p>
+            </div>
+            
             {/* Search Patients Section */}
             <div className="flex items-center space-x-2">
               <div className="relative">
@@ -405,43 +413,38 @@ const PatientRegistration = () => {
                   onChange={(e) => setSearchTerm(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleSearchPatients()}
                   className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-64"
-                  placeholder="Search by name, phone, or number..."
+                  placeholder="Search existing patients..."
                 />
               </div>
               <button
                 type="button"
                 onClick={handleSearchPatients}
                 disabled={isSearching}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center disabled:opacity-50"
+                className="btn-secondary hover:bg-gray-200 px-3"
               >
                 {isSearching ? (
-                  <Loader2 className="animate-spin mr-2" size={18} />
+                  <Loader2 className="animate-spin" size={18} />
                 ) : (
-                  <Search size={18} className="mr-2" />
+                  <Search size={18} />
                 )}
-                Search
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  console.log('Direct onClick called')
-                  handleShowAllPatients()
-                }}
+                onClick={handleShowAllPatients}
                 disabled={isSearching}
-                className="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors flex items-center disabled:opacity-50"
+                className="btn-secondary hover:bg-gray-200 px-3"
               >
                 {isSearching ? (
-                  <Loader2 className="animate-spin mr-2" size={18} />
+                  <Loader2 className="animate-spin" size={18} />
                 ) : (
-                  <Users size={18} className="mr-2" />
+                  <Users size={18} />
                 )}
-                {showPatientList ? 'Hide List' : 'Show All'}
               </button>
             </div>
           </div>
         </div>
 
-        {/* Patient List Modal/Overlay */}
+        {/* Patient List Overlay */}
         {showPatientList && (
           <div className="px-6 pt-4">
             <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
@@ -464,46 +467,38 @@ const PatientRegistration = () => {
                   <p>No patients found. {searchTerm ? 'Try a different search term.' : 'No patients in the system yet.'}</p>
                 </div>
               ) : (
-                <div className="space-y-3 max-h-64 overflow-y-auto">
+                <div className="space-y-2 max-h-64 overflow-y-auto">
                   {patients.map((patient) => (
                     <div
                       key={patient.id}
-                      className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-lg hover:bg-blue-50 transition-colors"
+                      className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:bg-blue-50 transition-colors"
                     >
-                      <div className="flex-1">
-                        <div className="flex items-center">
-                          <div className={`w-3 h-3 rounded-full mr-3 ${patient.is_ip ? 'bg-purple-500' : 'bg-blue-500'}`} />
-                          <div>
-                            <div className="flex items-center">
-                              <h4 className="font-semibold text-gray-900">{patient.name}</h4>
-                              <span className="ml-2 px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
-                                {patient.patient_number}
-                              </span>
-                            </div>
-                            <div className="flex items-center text-sm text-gray-600 mt-1">
-                              <span className="mr-4">Age: {patient.age}</span>
-                              <span className="mr-4">Gender: {patient.gender}</span>
-                              <span>Phone: {patient.phone}</span>
-                            </div>
-                            <p className="text-sm text-gray-600 mt-1 truncate">
-                              Complaint: {patient.complaint}
-                            </p>
+                      <div className="flex items-center flex-1">
+                        <div className={`w-2 h-2 rounded-full mr-3 ${patient.is_ip ? 'bg-purple-500' : 'bg-blue-500'}`} />
+                        <div>
+                          <div className="flex items-center">
+                            <h4 className="font-medium text-gray-900">{patient.name}</h4>
+                            <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-800">
+                              {patient.patient_number}
+                            </span>
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            Age: {patient.age} • Gender: {patient.gender} • Phone: {patient.phone}
                           </div>
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
                         <button
                           onClick={() => handleSelectPatient(patient)}
-                          className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+                          className="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
                         >
-                          Use for {isIP ? 'IP' : 'OP'}
+                          Use
                         </button>
                         <button
                           onClick={() => handleViewPatient(patient.id)}
-                          className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-100 transition-colors flex items-center"
+                          className="text-sm border border-gray-300 px-3 py-1 rounded hover:bg-gray-100"
                         >
-                          <Eye size={14} className="mr-1" />
-                          View
+                          <Eye size={14} />
                         </button>
                       </div>
                     </div>
@@ -517,7 +512,7 @@ const PatientRegistration = () => {
         {/* Selected Patient Info */}
         {selectedPatient && (
           <div className="px-6 pt-4">
-            <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
                   <UserCheck className="text-green-600 mr-3" size={20} />
@@ -548,9 +543,9 @@ const PatientRegistration = () => {
                       is_ip: isIP
                     })
                   }}
-                  className="text-green-700 hover:text-green-900 text-sm"
+                  className="text-sm text-green-700 hover:text-green-900"
                 >
-                  Clear Selection
+                  Clear
                 </button>
               </div>
             </div>
@@ -559,28 +554,24 @@ const PatientRegistration = () => {
 
         <form onSubmit={handleSubmit} className="p-6 space-y-8">
           {/* Basic Information */}
-          <div className="space-y-6">
-            <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-              <User className="mr-2 text-purple-600" size={20} />
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-gray-900 flex items-center pb-2 border-b">
+              <User className="mr-2 text-blue-600" size={20} />
               Basic Information
             </h3>
-
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-900">
                   Full Name *
                 </label>
-                <div className="relative">
-                  <User className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    placeholder="Enter patient's full name"
-                    required
-                  />
-                </div>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="input-field border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                  placeholder="Enter patient's full name"
+                  required
+                />
               </div>
 
               <div className="space-y-2">
@@ -591,7 +582,7 @@ const PatientRegistration = () => {
                   type="text"
                   value={formData.age}
                   onChange={(e) => setFormData({ ...formData, age: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="input-field border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                   placeholder="e.g., 30 years, 6 months, 7 days"
                   required
                 />
@@ -609,9 +600,9 @@ const PatientRegistration = () => {
                         name="gender"
                         checked={formData.gender === gender}
                         onChange={() => setFormData({ ...formData, gender: gender as any })}
-                        className="w-5 h-5 text-purple-600 focus:ring-purple-500 border-gray-300"
+                        className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300"
                       />
-                      <span className="text-gray-900">{gender}</span>
+                      <span className="text-gray-700">{gender}</span>
                     </label>
                   ))}
                 </div>
@@ -624,7 +615,7 @@ const PatientRegistration = () => {
                 <textarea
                   value={formData.complaint}
                   onChange={(e) => setFormData({ ...formData, complaint: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="input-field border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                   rows={3}
                   placeholder="Describe the patient's complaint"
                   required
@@ -634,23 +625,21 @@ const PatientRegistration = () => {
           </div>
 
           {/* Address Information */}
-          <div className="space-y-6">
-            <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-gray-900 flex items-center pb-2 border-b">
               <MapPin className="mr-2 text-green-600" size={20} />
               Address Information
             </h3>
-
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-900 flex items-center">
-                  <Home className="mr-1" size={14} />
+                <label className="block text-sm font-medium text-gray-900">
                   House/Flat No.
                 </label>
                 <input
                   type="text"
                   value={formData.house}
                   onChange={(e) => setFormData({ ...formData, house: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  className="input-field border-gray-300 focus:border-green-500 focus:ring-green-500"
                   placeholder="House number"
                 />
               </div>
@@ -663,7 +652,7 @@ const PatientRegistration = () => {
                   type="text"
                   value={formData.street}
                   onChange={(e) => setFormData({ ...formData, street: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  className="input-field border-gray-300 focus:border-green-500 focus:ring-green-500"
                   placeholder="Street name"
                 />
               </div>
@@ -676,7 +665,7 @@ const PatientRegistration = () => {
                   type="text"
                   value={formData.place}
                   onChange={(e) => setFormData({ ...formData, place: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  className="input-field border-gray-300 focus:border-green-500 focus:ring-green-500"
                   placeholder="City/Town"
                   required
                 />
@@ -685,28 +674,24 @@ const PatientRegistration = () => {
           </div>
 
           {/* Contact & Medical Information */}
-          <div className="space-y-6">
-            <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-              <Phone className="mr-2 text-blue-600" size={20} />
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-gray-900 flex items-center pb-2 border-b">
+              <Phone className="mr-2 text-purple-600" size={20} />
               Contact & Medical Information
             </h3>
-
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-900">
                   Phone Number *
                 </label>
-                <div className="relative">
-                  <Phone className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-                  <input
-                    type="tel"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="10-digit mobile number"
-                    required
-                  />
-                </div>
+                <input
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  className="input-field border-gray-300 focus:border-purple-500 focus:ring-purple-500"
+                  placeholder="10-digit mobile number"
+                  required
+                />
               </div>
 
               <div className="space-y-2">
@@ -716,13 +701,13 @@ const PatientRegistration = () => {
                 <select
                   value={formData.doctor_id}
                   onChange={(e) => setFormData({ ...formData, doctor_id: parseInt(e.target.value) })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="input-field border-gray-300 focus:border-purple-500 focus:ring-purple-500"
                   required
                 >
                   <option value="">Select Doctor</option>
                   {Array.isArray(doctors) && doctors.map((doctor) => (
                     <option key={doctor.id} value={doctor.id}>
-                      Dr. {doctor.name} ({doctor.code})
+                      {doctor.name} ({doctor.code})
                     </option>
                   ))}
                 </select>
@@ -736,7 +721,7 @@ const PatientRegistration = () => {
                   type="text"
                   value={formData.referred_by}
                   onChange={(e) => setFormData({ ...formData, referred_by: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="input-field border-gray-300 focus:border-purple-500 focus:ring-purple-500"
                   placeholder="Referring doctor/clinic"
                 />
               </div>
@@ -750,7 +735,7 @@ const PatientRegistration = () => {
                     type="text"
                     value={formData.room}
                     onChange={(e) => setFormData({ ...formData, room: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="input-field border-gray-300 focus:border-purple-500 focus:ring-purple-500"
                     placeholder="e.g., ICU-101, Ward-2A"
                     required={isIP}
                   />
@@ -759,55 +744,62 @@ const PatientRegistration = () => {
             </div>
           </div>
 
-          {/* Form Actions */}
-          <div className="flex flex-col sm:flex-row items-center justify-between space-y-4 sm:space-y-0 pt-6 border-t">
-            <div className="text-sm text-gray-600">
-              {selectedPatient ? (
-                <span className="text-green-600 font-semibold">
-                  Using data from existing patient: {selectedPatient.name}
-                </span>
+          {/* Form Actions - Matching DoctorMaster */}
+          <div className="flex justify-end space-x-3 pt-6 border-t">
+            <button
+              type="button"
+              onClick={handleDelete}
+              className="px-6 py-2.5 border border-red-300 rounded-lg font-medium text-red-700 hover:bg-red-50 transition-colors flex items-center"
+            >
+              <Trash2 size={20} className="mr-2" />
+              Clear Form
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/dashboard')}
+              className="px-6 py-2.5 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className={`px-6 py-2.5 text-white font-medium rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center shadow-md ${
+                isIP 
+                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700' 
+                  : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700'
+              }`}
+            >
+              {isLoading ? (
+                <Loader2 className="animate-spin mr-2" size={20} />
               ) : (
-                <>
-                  Logged in as: <span className="font-semibold text-gray-900">Hospital Staff</span>
-                </>
+                <Save size={20} className="mr-2" />
               )}
-            </div>
-
-            <div className="flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={handleDelete}
-                className="px-5 py-2.5 border border-red-300 text-red-700 font-medium rounded-xl hover:bg-red-50 transition-colors flex items-center"
-              >
-                <Trash2 size={18} className="mr-2" />
-                Clear Form
-              </button>
-
-              <button
-                type="button"
-                onClick={() => navigate('/dashboard')}
-                className="px-5 py-2.5 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-colors flex items-center"
-              >
-                <X size={18} className="mr-2" />
-                Cancel
-              </button>
-
-              <button
-                type="submit"
-                disabled={isLoading}
-                className={`px-6 py-2.5 text-white font-medium rounded-xl hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md flex items-center ${isIP ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700' : 'bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700'}`}
-              >
-                {isLoading ? (
-                  <Loader2 className="animate-spin mr-2" size={18} />
-                ) : (
-                  <Save size={18} className="mr-2" />
-                )}
-                {isLoading ? 'Registering...' : `Register as ${isIP ? 'IP' : 'OP'}`}
-              </button>
-            </div>
+              {isLoading ? 'Registering...' : `Register as ${isIP ? 'IP' : 'OP'}`}
+            </button>
           </div>
         </form>
       </div>
+
+      {/* Patient List Summary - Optional if you want to show quick stats */}
+      {!showPatientList && patients.length > 0 && (
+        <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <Users className="text-gray-400 mr-3" size={20} />
+              <span className="text-sm text-gray-600">
+                Found <span className="font-semibold">{patients.length}</span> patients in search
+              </span>
+            </div>
+            <button
+              onClick={() => setShowPatientList(true)}
+              className="text-sm text-blue-600 hover:text-blue-800"
+            >
+              Show all
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

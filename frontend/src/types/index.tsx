@@ -199,34 +199,12 @@ export interface IPBill {
   created_by: string;
 }
 
-// Appointment Types
-export interface Appointment {
-  id: number;
-  appointment_date: string;
-  patient_id: number;
-  doctor_id: number;
-  token_number: number;
-  status: 'Scheduled' | 'Completed' | 'Cancelled' | 'No Show';
-  notes: string | null;
-  patient?: Patient;
-  doctor?: Doctor;
-}
-
-export interface AppointmentCreate {
-  appointment_date: string;
-  patient_id: number;
-  doctor_id: number;
-  token_number: number;
-  notes?: string;
-}
-
 // Dashboard Types
 export interface DashboardStats {
   total_patients_today: number;
   total_op_bills_today: number;
   total_ip_bills_today: number;
   total_revenue_today: number;
-  pending_appointments: number;
 }
 
 // Report Types
@@ -249,21 +227,6 @@ export interface PatientListReport {
   total_count: number;
   ip_count: number;
   op_count: number;
-}
-
-export interface AppointmentListReport {
-  appointments: Array<{
-    id: number;
-    appointment_date: string;
-    token_number: number;
-    status: string;
-    notes: string | null;
-    patient_name: string | null;
-    patient_phone: string | null;
-    doctor_name: string | null;
-    doctor_specialty: string | null;
-  }>;
-  total_count: number;
 }
 
 // API Response Types

@@ -146,7 +146,7 @@ const DoctorMaster = () => {
       email: '',
       specialty: '',
       department: '',
-      op_validity: 30,
+      op_validity: 1,
       booking_code: '',
       max_tokens: 50,
       doctor_amount: 0,
@@ -311,7 +311,7 @@ const DoctorMaster = () => {
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     className="input-field border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                    placeholder="Dr. John Smith"
+                    placeholder="John Smith"
                     required
                   />
                 </div>

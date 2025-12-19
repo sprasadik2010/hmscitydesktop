@@ -5,7 +5,7 @@ from datetime import datetime, date
 
 from ...database import get_db
 from .auth import get_current_user
-from ..models import Patient, OPBill, IPBill, Appointment
+from ..models import Patient, OPBill, IPBill
 from ..schemas import DashboardStats
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
@@ -43,16 +43,9 @@ async def get_dashboard_stats(
     
     total_revenue_today = op_revenue + ip_revenue
     
-    # Pending appointments
-    pending_appointments = db.query(Appointment).filter(
-        Appointment.status == "Scheduled",
-        func.date(Appointment.appointment_date) >= today
-    ).count()
-    
     return DashboardStats(
         total_patients_today=total_patients_today,
         total_op_bills_today=total_op_bills_today,
         total_ip_bills_today=total_ip_bills_today,
-        total_revenue_today=total_revenue_today,
-        pending_appointments=pending_appointments
+        total_revenue_today=total_revenue_today
     )

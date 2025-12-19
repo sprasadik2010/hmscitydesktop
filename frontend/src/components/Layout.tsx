@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { 
   Home, 
   // Users, 
-  // UserPlus, 
+  UserPlus, 
   Stethoscope, 
   FileText, 
   ClipboardList,
@@ -54,13 +54,13 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
       description: 'Inpatient billing',
       color: 'from-red-500 to-pink-500'
     },
-    // { 
-    //   path: '/patient/registration', 
-    //   label: 'Patient Registration', 
-    //   icon: UserPlus,
-    //   description: 'OP & IP registration',
-    //   color: 'from-green-500 to-emerald-500'
-    // },
+    { 
+      path: '/patient/registration', 
+      label: 'Patient Registration', 
+      icon: UserPlus,
+      description: 'OP & IP registration',
+      color: 'from-green-500 to-emerald-500'
+    },
     { 
       path: '/doctor/master', 
       label: 'Doctor Master', 
@@ -75,13 +75,6 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
       description: 'Analytics & reports',
       color: 'from-indigo-500 to-purple-500'
     },
-    // { 
-    //   path: '/appointments', 
-    //   label: 'Appointments', 
-    //   icon: Calendar,
-    //   description: 'Schedule management',
-    //   color: 'from-teal-500 to-green-500'
-    // },
   ]
 
   const handleLogout = () => {
@@ -239,7 +232,7 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
             
             <div className="mt-6 pt-6 border-t border-blue-800">
               <p className="text-blue-300 text-xs text-center">
-                © 2024 HMS Pro. All rights reserved.
+                © 2025 HMS Pro. All rights reserved.
               </p>
             </div>
           </div>

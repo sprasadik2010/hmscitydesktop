@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
-import { Download, Filter, Calendar, Printer, FileText, BarChart3, Users, CreditCard, TrendingUp, Building, ArrowUpRight } from 'lucide-react'
+import { Download, Filter, Calendar, Printer, FileText, BarChart3, Users, CreditCard, TrendingUp, Building, ArrowUpRight, TestTube } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
 
@@ -8,77 +8,109 @@ const Reports = () => {
   const [activeReport, setActiveReport] = useState('daily-op')
   const [isLoading, setIsLoading] = useState(false)
   const [reportData, setReportData] = useState<any>(null)
-  
-  // Filters
+
+  // Common filters
   const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'))
-  const [doctorId, setDoctorId] = useState('')
+  const [doctorId] = useState('')
+
+  // Particulars report filters
+  const [particularName, setParticularName] = useState('X-RAY')
+  const [includeOp, setIncludeOp] = useState(true)
+  const [includeIp, setIncludeIp] = useState(true)
+  const [groupByPatient, setGroupByPatient] = useState(false)
+  const [particularsList, setParticularsList] = useState<string[]>([])
+  const [isLoadingParticulars, setIsLoadingParticulars] = useState(false)
 
   const reportTypes = [
-    { 
-      id: 'daily-op', 
-      label: 'Daily OP Report', 
+    {
+      id: 'daily-op',
+      label: 'Daily OP Report',
       icon: FileText,
       color: 'from-blue-500 to-cyan-500',
       description: 'Daily outpatient billing summary'
     },
-    { 
-      id: 'bill-summary', 
-      label: 'Revenue Report', 
+    {
+      id: 'bill-summary',
+      label: 'Revenue Report',
       icon: BarChart3,
       color: 'from-green-500 to-emerald-500',
       description: 'Complete billing revenue overview'
     },
-    { 
-      id: 'patient-list', 
-      label: 'Patient List', 
+    {
+      id: 'patient-list',
+      label: 'Patient List',
       icon: Users,
       color: 'from-purple-500 to-indigo-500',
       description: 'Registered patient records'
     },
-    { 
-      id: 'appointment-list', 
-      label: 'Appointments', 
-      icon: Calendar,
-      color: 'from-orange-500 to-red-500',
-      description: 'Doctor appointment schedule'
+    {
+      id: 'particulars-report',
+      label: 'Particulars Report',
+      icon: TestTube,
+      color: 'from-teal-500 to-cyan-500',
+      description: 'Report by medical particulars (X-RAY, ECG, etc.)'
     }
   ]
+
+  const fetchParticularsList = async (search: string = '') => {
+    setIsLoadingParticulars(true)
+    try {
+      const response = await axios.get('/reports/particulars-list', {
+        params: { search, limit: 20 }
+      })
+      setParticularsList(response.data.particulars)
+      console.log(particularsList.length)
+    } catch (error) {
+      console.error('Failed to fetch particulars list')
+      setParticularsList([])
+    } finally {
+      setIsLoadingParticulars(false)
+      console.log(isLoadingParticulars)
+    }
+  }
 
   const fetchReport = async () => {
     setIsLoading(true)
     try {
       let response
-      
+
       switch (activeReport) {
         case 'daily-op':
           response = await axios.get('/reports/daily-op', {
             params: { report_date: startDate }
           })
           break
-        
+
         case 'bill-summary':
           response = await axios.get('/reports/bill-summary', {
             params: { start_date: startDate, end_date: endDate }
           })
           break
-        
+
         case 'patient-list':
           response = await axios.get('/reports/patient-list', {
             params: { start_date: startDate, end_date: endDate }
           })
           break
-        
-        case 'appointment-list':
-          response = await axios.get('/reports/appointment-list', {
-            params: { appointment_date: startDate, doctor_id: doctorId || undefined }
+
+        case 'particulars-report':
+          response = await axios.get('/reports/particulars-report', {
+            params: {
+              particular_name: particularName,
+              start_date: startDate,
+              end_date: endDate,
+              include_op: includeOp,
+              include_ip: includeIp,
+              group_by_patient: groupByPatient
+            }
           })
           break
-        
+
         default:
           response = await axios.get('/reports/daily-op')
       }
-      
+
       setReportData(response.data)
     } catch (error) {
       toast.error('Failed to fetch report')
@@ -92,13 +124,17 @@ const Reports = () => {
     fetchReport()
   }, [activeReport, startDate, endDate, doctorId])
 
+  useEffect(() => {
+    fetchParticularsList()
+  }, [])
+
   const handlePrint = () => {
     window.print()
   }
 
   const handleExport = () => {
     if (!reportData) return
-    
+
     const dataStr = JSON.stringify(reportData, null, 2)
     const dataBlob = new Blob([dataStr], { type: 'application/json' })
     const url = URL.createObjectURL(dataBlob)
@@ -112,12 +148,14 @@ const Reports = () => {
 
   const getTotalRevenue = () => {
     if (!reportData) return 0
-    
+
     if (activeReport === 'daily-op') {
-      return Array.isArray(reportData) 
+      return Array.isArray(reportData)
         ? reportData.reduce((sum: number, bill: any) => sum + (bill.net_amount || 0), 0)
         : 0
     } else if (activeReport === 'bill-summary') {
+      return reportData.total_amount || 0
+    } else if (activeReport === 'particulars-report') {
       return reportData.total_amount || 0
     }
     return 0
@@ -125,13 +163,236 @@ const Reports = () => {
 
   const getRecordCount = () => {
     if (!reportData) return 0
-    
+
     if (Array.isArray(reportData)) {
       return reportData.length
     } else if (reportData.op_bills || reportData.ip_bills) {
       return (reportData.op_bills?.length || 0) + (reportData.ip_bills?.length || 0)
+    } else if (reportData.total_count !== undefined) {
+      return reportData.total_count
     }
     return 0
+  }
+
+  const renderParticularsReport = () => {
+    if (!reportData) return null
+
+    return (
+      <div className="space-y-6">
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="bg-gradient-to-r from-teal-50 to-cyan-50 rounded-xl p-6 border border-teal-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Particular</p>
+                <p className="text-xl font-bold text-gray-900 truncate">{reportData.particular_name}</p>
+              </div>
+              <div className="p-3 bg-teal-100 rounded-lg">
+                <TestTube className="text-teal-600" size={24} />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl p-6 border border-blue-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Total Count</p>
+                <p className="text-2xl font-bold text-gray-900">{reportData.total_count || 0}</p>
+              </div>
+              <div className="p-3 bg-blue-100 rounded-lg">
+                <BarChart3 className="text-blue-600" size={24} />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 border border-green-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">OP Count</p>
+                <p className="text-2xl font-bold text-gray-900">{reportData.op_details?.length || 0}</p>
+              </div>
+              <div className="p-3 bg-green-100 rounded-lg">
+                <FileText className="text-green-600" size={24} />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl p-6 border border-purple-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">IP Count</p>
+                <p className="text-2xl font-bold text-gray-900">{reportData.ip_details?.length || 0}</p>
+              </div>
+              <div className="p-3 bg-purple-100 rounded-lg">
+                <Building className="text-purple-600" size={24} />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Total Revenue Card */}
+        <div className="bg-gradient-to-r from-green-100 to-emerald-100 rounded-xl p-6 border border-green-300">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-700">Total Revenue from {reportData.particular_name}</p>
+              <p className="text-3xl font-bold text-green-800">
+                ₹{(reportData.total_amount || 0).toFixed(2)}
+              </p>
+              <p className="text-sm text-gray-600 mt-1">
+                Period: {format(new Date(startDate), 'dd/MM/yyyy')} - {format(new Date(endDate), 'dd/MM/yyyy')}
+              </p>
+            </div>
+            <div className="p-4 bg-green-200 rounded-xl">
+              <CreditCard className="text-green-700" size={32} />
+            </div>
+          </div>
+        </div>
+
+        {/* Summary by Date */}
+        {reportData.summary_by_date && reportData.summary_by_date.length > 0 && (
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
+              <Calendar className="mr-2 text-blue-600" size={20} />
+              Summary by Date
+            </h3>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Date</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">OP Count</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">IP Count</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Total Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {reportData.summary_by_date.map((item: any, index: number) => (
+                    <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                      <td className="px-4 py-3 whitespace-nowrap font-medium text-gray-900">
+                        {item.date ? format(new Date(item.date), 'dd/MM/yyyy') : 'N/A'}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                          {item.op_count || 0}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className="px-2 py-1 text-xs font-medium bg-purple-100 text-purple-800 rounded-full">
+                          {item.ip_count || 0}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap font-bold text-green-700">
+                        ₹{(item.total_amount || 0).toFixed(2)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Detailed Data Table */}
+        <div className="overflow-x-auto rounded-xl border border-gray-200">
+          <div className="bg-gradient-to-r from-teal-50 to-teal-100 p-4 border-b border-teal-200">
+            <h3 className="text-lg font-bold text-gray-900">
+              Detailed Records ({reportData.total_count || 0})
+            </h3>
+          </div>
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Bill No</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Type</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Patient</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Date</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Particular</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Qty</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Rate</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Total</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {reportData.op_details?.map((item: any, index: number) => (
+                <tr key={`op-${index}`} className={index % 2 === 0 ? 'bg-white' : 'bg-blue-50'}>
+                  <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">{item.bill_number}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">OP</span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="font-medium text-gray-900">{item.patient_name}</div>
+                    <div className="text-sm text-gray-600">{item.patient_age} • {item.patient_gender}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {item.bill_date ? format(new Date(item.bill_date), 'dd/MM/yyyy') : 'N/A'}
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="font-medium text-gray-900">{item.particular}</div>
+                    <div className="text-sm text-gray-600">{item.department}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">{item.quantity}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">₹{item.rate?.toFixed(2) || '0.00'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap font-bold text-green-700">₹{item.total?.toFixed(2) || '0.00'}</td>
+                </tr>
+              ))}
+
+              {reportData.ip_details?.map((item: any, index: number) => (
+                <tr key={`ip-${index}`} className={index % 2 === 0 ? 'bg-white' : 'bg-purple-50'}>
+                  <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">{item.bill_number}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="px-2 py-1 text-xs font-medium bg-purple-100 text-purple-800 rounded-full">IP</span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="font-medium text-gray-900">{item.patient_name}</div>
+                    <div className="text-sm text-gray-600">{item.patient_age} • {item.patient_gender}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {item.bill_date ? format(new Date(item.bill_date), 'dd/MM/yyyy') : 'N/A'}
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="font-medium text-gray-900">{item.particular}</div>
+                    <div className="text-sm text-gray-600">{item.department}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">{item.quantity}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">₹{item.rate?.toFixed(2) || '0.00'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap font-bold text-green-700">₹{item.total?.toFixed(2) || '0.00'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Grouped by Patient */}
+        {groupByPatient && reportData.grouped_by_patient && (
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
+              <Users className="mr-2 text-purple-600" size={20} />
+              Grouped by Patient
+            </h3>
+            <div className="space-y-4">
+              {reportData.grouped_by_patient.map((patient: any, index: number) => (
+                <div key={index} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <h4 className="font-bold text-gray-900">{patient.patient_name}</h4>
+                      <p className="text-sm text-gray-600">
+                        {patient.patient_age} • {patient.patient_gender} • Total: {patient.total_count} procedures
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-green-700">₹{patient.total_amount?.toFixed(2)}</p>
+                    </div>
+                  </div>
+                  <div className="text-sm text-gray-500">
+                    Procedures: {patient.details?.map((d: any) => d.particular).join(', ')}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    )
   }
 
   const renderReportContent = () => {
@@ -150,7 +411,7 @@ const Reports = () => {
           <FileText className="w-20 h-20 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-700 mb-2">No Data Available</h3>
           <p className="text-gray-500 max-w-md mx-auto">
-            {getRecordCount() === 0 ? 
+            {getRecordCount() === 0 ?
               'No records found for the selected filters. Try adjusting your date range or criteria.' :
               'Select a report type and apply filters to view data.'
             }
@@ -180,7 +441,7 @@ const Reports = () => {
                   <span className="text-green-600">Daily report</span>
                 </div>
               </div>
-              
+
               <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 border border-green-200">
                 <div className="flex items-center justify-between">
                   <div>
@@ -196,13 +457,13 @@ const Reports = () => {
                   <span className="text-green-600">Today's collection</span>
                 </div>
               </div>
-              
+
               <div className="bg-gradient-to-r from-yellow-50 to-amber-50 rounded-xl p-6 border border-yellow-200">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-600">Cash Bills</p>
                     <p className="text-2xl font-bold text-gray-900">
-                      {reportData.filter((b: any) => b.bill_type === 'Cash').length}
+                      {Array.isArray(reportData) ? reportData.filter((b: any) => b.bill_type === 'Cash').length : 0}
                     </p>
                   </div>
                   <div className="p-3 bg-yellow-100 rounded-lg">
@@ -210,13 +471,13 @@ const Reports = () => {
                   </div>
                 </div>
               </div>
-              
+
               <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl p-6 border border-purple-200">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-600">Insurance Bills</p>
                     <p className="text-2xl font-bold text-gray-900">
-                      {reportData.filter((b: any) => b.bill_type === 'Insurance').length}
+                      {Array.isArray(reportData) ? reportData.filter((b: any) => b.bill_type === 'Insurance').length : 0}
                     </p>
                   </div>
                   <div className="p-3 bg-purple-100 rounded-lg">
@@ -270,12 +531,11 @@ const Reports = () => {
                         <div className="text-sm text-gray-600">{bill.doctor?.specialty || ''}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-3 py-1 text-xs font-medium rounded-full ${
-                          bill.bill_type === 'Cash' ? 'bg-green-100 text-green-800' :
-                          bill.bill_type === 'Insurance' ? 'bg-blue-100 text-blue-800' :
-                          bill.bill_type === 'Card' ? 'bg-purple-100 text-purple-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
+                        <span className={`px-3 py-1 text-xs font-medium rounded-full ${bill.bill_type === 'Cash' ? 'bg-green-100 text-green-800' :
+                            bill.bill_type === 'Insurance' ? 'bg-blue-100 text-blue-800' :
+                              bill.bill_type === 'Card' ? 'bg-purple-100 text-purple-800' :
+                                'bg-gray-100 text-gray-800'
+                          }`}>
                           {bill.bill_type}
                         </span>
                       </td>
@@ -311,7 +571,7 @@ const Reports = () => {
                   </div>
                 </div>
               </div>
-              
+
               <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl p-6 border border-purple-200">
                 <div className="flex items-center justify-between">
                   <div>
@@ -324,7 +584,7 @@ const Reports = () => {
                   </div>
                 </div>
               </div>
-              
+
               <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 border border-green-200">
                 <div className="flex items-center justify-between">
                   <div>
@@ -371,11 +631,10 @@ const Reports = () => {
                         <div className="font-medium text-gray-900">{bill.bill_number}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-3 py-1 text-xs font-medium rounded-full flex items-center w-16 justify-center ${
-                          bill.bill_number?.startsWith('OP') 
-                            ? 'bg-blue-100 text-blue-800' 
+                        <span className={`px-3 py-1 text-xs font-medium rounded-full flex items-center w-16 justify-center ${bill.bill_number?.startsWith('OP')
+                            ? 'bg-blue-100 text-blue-800'
                             : 'bg-purple-100 text-purple-800'
-                        }`}>
+                          }`}>
                           {bill.bill_number?.startsWith('OP') ? 'OP' : 'IP'}
                         </span>
                       </td>
@@ -487,11 +746,10 @@ const Reports = () => {
                         <div className="text-sm text-gray-600">{format(new Date(patient.registration_date), 'HH:mm')}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-3 py-1 text-xs font-medium rounded-full ${
-                          patient.is_ip 
-                            ? 'bg-purple-100 text-purple-800' 
+                        <span className={`px-3 py-1 text-xs font-medium rounded-full ${patient.is_ip
+                            ? 'bg-purple-100 text-purple-800'
                             : 'bg-blue-100 text-blue-800'
-                        }`}>
+                          }`}>
                           {patient.is_ip ? 'INPATIENT' : 'OUTPATIENT'}
                         </span>
                       </td>
@@ -503,108 +761,8 @@ const Reports = () => {
           </div>
         )
 
-      case 'appointment-list':
-        return (
-          <div className="space-y-6">
-            {/* Status Summary */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              {['Scheduled', 'Completed', 'Cancelled', 'No Show'].map((status) => {
-                const count = Array.isArray(reportData) 
-                  ? reportData.filter((a: any) => a.status === status).length 
-                  : 0
-                
-                const getStatusColor = (s: string) => {
-                  switch (s) {
-                    case 'Scheduled': return 'from-blue-50 to-cyan-50 border-blue-200 text-blue-600'
-                    case 'Completed': return 'from-green-50 to-emerald-50 border-green-200 text-green-600'
-                    case 'Cancelled': return 'from-red-50 to-orange-50 border-red-200 text-red-600'
-                    default: return 'from-gray-50 to-gray-100 border-gray-200 text-gray-600'
-                  }
-                }
-                
-                return (
-                  <div key={status} className={`bg-gradient-to-r rounded-xl p-6 border ${getStatusColor(status)}`}>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium">{status}</p>
-                        <p className="text-2xl font-bold mt-1">{count}</p>
-                      </div>
-                      <Calendar className="opacity-70" size={24} />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-
-            {/* Appointments Table */}
-            <div className="overflow-x-auto rounded-xl border border-gray-200">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
-                  <tr>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-900 uppercase tracking-wider">
-                      Token No
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-900 uppercase tracking-wider">
-                      Patient Details
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-900 uppercase tracking-wider">
-                      Doctor Details
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-900 uppercase tracking-wider">
-                      Time Slot
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-900 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-900 uppercase tracking-wider">
-                      Notes
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {Array.isArray(reportData) && reportData.map((appointment: any, index: number) => (
-                    <tr key={appointment.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="font-bold text-lg text-gray-900">{appointment.token_number}</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="font-medium text-gray-900">{appointment.patient_name}</div>
-                        <div className="text-sm text-gray-600">{appointment.patient_phone}</div>
-                        <div className="text-xs text-gray-500">{appointment.patient_age || ''} {appointment.patient_gender ? `• ${appointment.patient_gender}` : ''}</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="font-medium text-gray-900">{appointment.doctor_name}</div>
-                        <div className="text-sm text-gray-600">{appointment.doctor_specialty}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-gray-900 font-medium">
-                          {format(new Date(appointment.appointment_date), 'hh:mm a')}
-                        </div>
-                        <div className="text-sm text-gray-600">
-                          {format(new Date(appointment.appointment_date), 'dd/MM/yyyy')}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-3 py-1.5 text-xs font-medium rounded-full ${
-                          appointment.status === 'Scheduled' 
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : appointment.status === 'Completed'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-red-100 text-red-800'
-                        }`}>
-                          {appointment.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-gray-700 max-w-xs">{appointment.notes || '-'}</div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )
+      case 'particulars-report':
+        return renderParticularsReport()
 
       default:
         return null
@@ -632,20 +790,19 @@ const Reports = () => {
         </div>
 
         {/* Report Type Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           {reportTypes.map((report) => {
             const Icon = report.icon
             const isActive = activeReport === report.id
-            
+
             return (
               <button
                 key={report.id}
                 onClick={() => setActiveReport(report.id)}
-                className={`rounded-2xl p-5 text-left transition-all transform hover:-translate-y-1 ${
-                  isActive 
-                    ? `${report.color} text-white shadow-xl` 
+                className={`rounded-2xl p-5 text-left transition-all transform hover:-translate-y-1 ${isActive
+                    ? `${report.color} text-white shadow-xl`
                     : 'bg-white/10 backdrop-blur-sm text-white/90 hover:bg-white/20'
-                }`}
+                  }`}
               >
                 <div className="flex items-center justify-between mb-4">
                   <div className={`p-3 rounded-xl ${isActive ? 'bg-white/20' : 'bg-white/10'}`}>
@@ -684,7 +841,7 @@ const Reports = () => {
                 <p className="text-gray-600">Customize date range and parameters</p>
               </div>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-900">
@@ -700,7 +857,7 @@ const Reports = () => {
                   />
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-900">
                   End Date *
@@ -715,23 +872,93 @@ const Reports = () => {
                   />
                 </div>
               </div>
-              
-              {activeReport === 'appointment-list' && (
+            </div>
+
+            {/* Particulars Report Filters */}
+            {activeReport === 'particulars-report' && (
+              <div className="mt-6 space-y-4">
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-gray-900">
-                    Doctor (Optional)
+                    Particular Name *
                   </label>
-                  <input
-                    type="text"
-                    value={doctorId}
-                    onChange={(e) => setDoctorId(e.target.value)}
-                    placeholder="Enter doctor ID"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
+                  <div className="relative">
+                    <select
+                      value={particularName}
+                      onChange={(e) => setParticularName(e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent appearance-none bg-white"
+                    >
+                      <option value="">Select a particular...</option>
+                      {Array.from(new Set([
+                        'Room Charges',
+                        'Doctor Fees',
+                        'Water Bill',
+                        'Professional Fee',
+                        'Consultation',
+                        'Review',
+                        'Procedure',
+                        'physiotherapy',
+                        'Medicine',
+                        'Test',
+                        'X-Ray',
+                        'ECG',
+                        'Ultrasound',
+                        'Injection',
+                        'Dressing',
+                        'Other'
+                      ]))
+                        .sort((a, b) => a.localeCompare(b))
+                        .map((item, index) => (
+                          <option key={index} value={item}>
+                            {item}
+                          </option>
+                        ))}
+                    </select>
+                    <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                      <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    Select from: X-RAY, ECG, BLOOD TEST, USG, CT SCAN, MRI, etc.
+                  </p>
                 </div>
-              )}
-            </div>
-            
+
+                {/* Checkboxes - unchanged */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <label className="flex items-center space-x-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <input
+                      type="checkbox"
+                      checked={includeOp}
+                      onChange={(e) => setIncludeOp(e.target.checked)}
+                      className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                    />
+                    <span className="text-sm font-medium text-gray-900">Include OP Bills</span>
+                  </label>
+
+                  <label className="flex items-center space-x-3 p-3 bg-purple-50 rounded-lg border border-purple-200">
+                    <input
+                      type="checkbox"
+                      checked={includeIp}
+                      onChange={(e) => setIncludeIp(e.target.checked)}
+                      className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+                    />
+                    <span className="text-sm font-medium text-gray-900">Include IP Bills</span>
+                  </label>
+
+                  <label className="flex items-center space-x-3 p-3 bg-teal-50 rounded-lg border border-teal-200">
+                    <input
+                      type="checkbox"
+                      checked={groupByPatient}
+                      onChange={(e) => setGroupByPatient(e.target.checked)}
+                      className="w-4 h-4 text-teal-600 rounded focus:ring-teal-500"
+                    />
+                    <span className="text-sm font-medium text-gray-900">Group by Patient</span>
+                  </label>
+                </div>
+              </div>
+            )}
+
             <div className="flex justify-end space-x-3 mt-6">
               <button
                 onClick={fetchReport}
@@ -763,7 +990,7 @@ const Reports = () => {
                 Generated for period: {format(new Date(startDate), 'dd MMM yyyy')} - {format(new Date(endDate), 'dd MMM yyyy')}
               </p>
             </div>
-            
+
             <div className="flex flex-wrap gap-3">
               <button
                 onClick={handleExport}
@@ -773,7 +1000,7 @@ const Reports = () => {
                 <Download size={18} className="mr-2" />
                 Export Report
               </button>
-              
+
               <button
                 onClick={handlePrint}
                 disabled={!reportData || isLoading}
@@ -800,20 +1027,20 @@ const Reports = () => {
                     {reportTypes.find(r => r.id === activeReport)?.label}
                   </p>
                 </div>
-                
+
                 <div className="space-y-2">
                   <p className="text-sm font-medium text-gray-700">Total Records</p>
                   <p className="text-2xl font-bold text-gray-900">{getRecordCount()}</p>
                 </div>
-                
-                {(activeReport === 'daily-op' || activeReport === 'bill-summary') && (
+
+                {(activeReport === 'daily-op' || activeReport === 'bill-summary' || activeReport === 'particulars-report') && (
                   <div className="space-y-2">
                     <p className="text-sm font-medium text-gray-700">Total Revenue</p>
                     <p className="text-3xl font-bold text-green-700">₹{getTotalRevenue().toFixed(2)}</p>
                   </div>
                 )}
               </div>
-              
+
               <div className="mt-4 pt-4 border-t border-gray-300">
                 <p className="text-sm text-gray-600">
                   Report generated on {format(new Date(), 'dd MMMM yyyy')} at {format(new Date(), 'hh:mm a')}

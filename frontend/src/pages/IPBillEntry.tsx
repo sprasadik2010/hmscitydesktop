@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
-import { /*Save, Trash2,*/ X, /* Printer, */ Search, Building, CalendarClock, /* User, Phone, Mail, Home, MapPin, */ Bed, /* IndianRupee, */ Loader2, Users, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react'
+import { X, Search, Building, CalendarClock, Bed, Loader2, Users, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
+import type { AxiosError } from 'axios'
 
 interface BillItem {
   particular: string
@@ -13,6 +14,11 @@ interface BillItem {
   discount_percent: number
   discount_amount: number
   total: number
+}
+
+interface BillPurtcularsnDept {
+  particular: string
+  department: string
 }
 
 interface Doctor {
@@ -77,6 +83,10 @@ interface BillDetails {
 const IPBillEntry = () => {
   const navigate = useNavigate()
   const [currentTime] = useState(new Date())
+
+  // Use useRef to store bill number that persists across re-renders
+  const billNumberRef = useRef<string>('')
+
   const [doctors, setDoctors] = useState<Doctor[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
@@ -84,14 +94,48 @@ const IPBillEntry = () => {
   const [searchQuery, setSearchQuery] = useState('')
   const [patients, setPatients] = useState<Patient[]>([])
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
-  
+
   // Previous bills states
   const [previousBills, setPreviousBills] = useState<PreviousBill[]>([])
   const [currentBillIndex, setCurrentBillIndex] = useState<number>(-1)
   const [isLoadingBills, setIsLoadingBills] = useState(false)
   const [showPreviousBills, setShowPreviousBills] = useState(false)
   const [isLoadingBillDetails, setIsLoadingBillDetails] = useState(false)
-  
+
+  const DEPARTMENTS = [
+    'General Medicine',
+    'Cardiology',
+    'Pediatrics',
+    'Orthopedics',
+    'Dermatology',
+    'Neurology',
+    'ENT',
+    'Ophthalmology',
+    'Dentistry',
+    'General',
+    'Hospital',
+    'OPD'
+  ]
+
+  // Add these constants near the top of your component
+  const PARTICULAR_ITEMS = [
+    'Room Charges',
+    'Doctor Fees',
+    'Water Bill',
+    'Professional Fee',
+    'Consultation',
+    'Review',
+    'Procedure',
+    'physiotherapy',
+    'Medicine',
+    'Test',
+    'X-Ray',
+    'ECG',
+    'Ultrasound',
+    'Injection',
+    'Dressing',
+    'Other'
+  ]
   // Patient Form Data
   const [patientFormData, setPatientFormData] = useState({
     name: '',
@@ -108,7 +152,7 @@ const IPBillEntry = () => {
     room: '',
     admission_date: format(new Date(), 'yyyy-MM-dd')
   })
-  
+
   // Bill Form Data
   const [billFormData, setBillFormData] = useState({
     bill_type: 'Cash',
@@ -122,12 +166,36 @@ const IPBillEntry = () => {
     education_cess: 0,
     she_education_cess: 0
   })
-  
-  const [billItems, setBillItems] = useState<BillItem[]>([
-    { particular: 'Room Charges', department: 'General', doctor_id: 0, amount: 0, discount_percent: 0, discount_amount: 0, total: 0 },
-    { particular: 'Doctor Fees', department: 'General', doctor_id: 0, amount: 0, discount_percent: 0, discount_amount: 0, total: 0 },
-    { particular: 'Medicine', department: 'Pharmacy', doctor_id: 0, amount: 0, discount_percent: 0, discount_amount: 0, total: 0 }
-  ])
+
+  const [billPurticularsnDepts] = useState<BillPurtcularsnDept[]>([
+    { particular: 'Room Charges', department: 'General' },
+    { particular: 'Doctor Fees', department: 'General' },
+    { particular: 'Water Bill', department: 'General' },
+    { particular: 'Professional Fee', department: 'Hospital' },
+  ]);
+
+  const [billItems, setBillItems] = useState<BillItem[]>([]);
+
+  // Initialize bill number on component mount
+  useEffect(() => {
+    // Generate initial bill number only once
+    if (!billNumberRef.current) {
+      billNumberRef.current = generateBillNumber()
+    }
+
+    // Initialize bill items
+    const doctorId = patientFormData.doctor_id
+    const initialBillItems = billPurticularsnDepts.map((PnD) => ({
+      particular: PnD.particular,
+      department: PnD.department,
+      doctor_id: doctorId,
+      amount: 0,
+      discount_percent: 0,
+      discount_amount: 0,
+      total: 0
+    }));
+    setBillItems(initialBillItems);
+  }, [billPurticularsnDepts]);
 
   useEffect(() => {
     fetchDoctors()
@@ -138,7 +206,13 @@ const IPBillEntry = () => {
       const response = await axios.get('/doctors')
       setDoctors(response.data)
       if (response.data.length > 0) {
-        setPatientFormData(prev => ({ ...prev, doctor_id: response.data[0].id }))
+        const doctorId = response.data[0].id
+        setPatientFormData(prev => ({ ...prev, doctor_id: doctorId }))
+        // Update bill items with the new doctor ID
+        setBillItems(prev => prev.map(item => ({
+          ...item,
+          doctor_id: doctorId
+        })))
       }
     } catch (error) {
       toast.error('Failed to load doctors')
@@ -159,8 +233,18 @@ const IPBillEntry = () => {
       setShowSearchResults(true)
       toast.success(`Found ${ipPatients.length} IP patients`)
     } catch (error) {
-      toast.error('Failed to search patients')
+      const axiosError = error as AxiosError
+
+      if (axiosError.response) {
+        toast.error(`Search failed: ${axiosError.response.status}`)
+      } else if (axiosError.request) {
+        toast.error('Network error - unable to connect to server')
+      } else {
+        toast.error('Search failed: ' + axiosError.message)
+      }
+
       setPatients([])
+      setShowSearchResults(false)
     } finally {
       setIsSearching(false)
     }
@@ -168,7 +252,7 @@ const IPBillEntry = () => {
 
   const handleSelectPatient = async (patient: Patient) => {
     setSelectedPatient(patient)
-    
+
     // Populate patient form
     setPatientFormData({
       name: patient.name,
@@ -185,15 +269,21 @@ const IPBillEntry = () => {
       room: patient.room || '',
       admission_date: patient.admission_date || format(new Date(), 'yyyy-MM-dd')
     })
-    
+
     // Reset previous bills navigation
     setPreviousBills([])
     setCurrentBillIndex(-1)
     setShowPreviousBills(false)
-    
+
+    // Update bill items with selected patient's doctor ID
+    setBillItems(prev => prev.map(item => ({
+      ...item,
+      doctor_id: patient.doctor_id
+    })));
+
     // Load previous bills for this patient
     await fetchPreviousBills(patient.id)
-    
+
     setShowSearchResults(false)
     setSearchQuery('')
     toast.success(`Patient ${patient.name} selected`)
@@ -204,11 +294,11 @@ const IPBillEntry = () => {
     try {
       const response = await axios.get(`/bills/ip/${patientId}`)
       // Sort bills by date (newest first)
-      const sortedBills = response.data.sort((a: any, b: any) => 
+      const sortedBills = response.data.sort((a: any, b: any) =>
         new Date(b.bill_date).getTime() - new Date(a.bill_date).getTime()
       )
       setPreviousBills(sortedBills)
-      
+
       if (sortedBills.length > 0) {
         setShowPreviousBills(true)
         // Don't load any bill by default - start with blank form
@@ -228,30 +318,30 @@ const IPBillEntry = () => {
 
   const handleLoadPreviousBill = async (index: number) => {
     if (index < 0 || index >= previousBills.length) return
-    
+
     const bill = previousBills[index]
-    
+
     // Show confirmation before loading bill
     const confirmLoad = window.confirm(
       `Load bill ${bill.bill_number} from ${format(new Date(bill.bill_date), 'dd/MM/yyyy')}?\n` +
       `This will replace your current bill items.`
     )
-    
+
     if (!confirmLoad) return
-    
+
     try {
       setIsLoadingBillDetails(true)
-      
+
       // Fetch complete bill details with items using your API
       const response = await axios.get(`/bills/ip/details/${bill.id}`)
       const billDetails: BillDetails = response.data
-      
+
       // Update current bill index
       setCurrentBillIndex(index)
-      
+
       // Populate form with loaded bill data
       populateFormWithBill(billDetails)
-      
+
       toast.success(`Bill ${bill.bill_number} loaded successfully`)
     } catch (error: any) {
       console.error('Error loading bill details:', error)
@@ -264,7 +354,7 @@ const IPBillEntry = () => {
 
   const populateFormWithBill = (billDetails: BillDetails) => {
     const { bill, items } = billDetails
-    
+
     // Update bill form data
     setBillFormData({
       bill_type: bill.is_credit ? 'Credit' : 'Cash',
@@ -278,7 +368,7 @@ const IPBillEntry = () => {
       education_cess: bill.education_cess || 0,
       she_education_cess: bill.she_education_cess || 0
     })
-    
+
     // Update patient form data (if available in bill)
     if (selectedPatient) {
       setPatientFormData(prev => ({
@@ -288,24 +378,34 @@ const IPBillEntry = () => {
         doctor_id: bill.doctor_id || prev.doctor_id
       }))
     }
-    
+
     // Update bill items
-    const mappedItems: BillItem[] = items.map(item => ({
-      particular: item.particular,
-      department: item.department,
-      doctor_id: selectedPatient?.doctor_id || patientFormData.doctor_id,
-      amount: item.amount,
-      discount_percent: item.discount_percent,
-      discount_amount: item.discount_amount,
-      total: item.total
-    }))
-    
-    // If no items, keep default items
-    setBillItems(mappedItems.length > 0 ? mappedItems : [
-      { particular: 'Room Charges', department: 'General', doctor_id: selectedPatient?.doctor_id || patientFormData.doctor_id, amount: 0, discount_percent: 0, discount_amount: 0, total: 0 },
-      { particular: 'Doctor Fees', department: 'General', doctor_id: selectedPatient?.doctor_id || patientFormData.doctor_id, amount: 0, discount_percent: 0, discount_amount: 0, total: 0 },
-      { particular: 'Medicine', department: 'Pharmacy', doctor_id: selectedPatient?.doctor_id || patientFormData.doctor_id, amount: 0, discount_percent: 0, discount_amount: 0, total: 0 }
-    ])
+    if (items.length > 0) {
+      const doctorId = selectedPatient?.doctor_id || patientFormData.doctor_id
+      const mappedItems: BillItem[] = items.map(item => ({
+        particular: item.particular,
+        department: item.department,
+        doctor_id: doctorId,
+        amount: item.amount,
+        discount_percent: item.discount_percent,
+        discount_amount: item.discount_amount,
+        total: item.total
+      }))
+      setBillItems(mappedItems)
+    } else {
+      // If no items, use default items from billPurticularsnDepts
+      const doctorId = selectedPatient?.doctor_id || patientFormData.doctor_id
+      const defaultItems = billPurticularsnDepts.map(PnD => ({
+        particular: PnD.particular,
+        department: PnD.department,
+        doctor_id: doctorId,
+        amount: 0,
+        discount_percent: 0,
+        discount_amount: 0,
+        total: 0
+      }))
+      setBillItems(defaultItems)
+    }
   }
 
   const handleNextBill = () => {
@@ -322,7 +422,7 @@ const IPBillEntry = () => {
 
   const handleClearCurrentBill = () => {
     setCurrentBillIndex(-1)
-    
+
     // Reset bill form to default (keeping patient selected)
     setBillFormData({
       bill_type: 'Cash',
@@ -336,15 +436,20 @@ const IPBillEntry = () => {
       education_cess: 0,
       she_education_cess: 0
     })
-    
-    // Reset bill items with current patient's doctor
+
+    // Reset bill items using billPurticularsnDepts with current patient's doctor
     const doctorId = selectedPatient?.doctor_id || patientFormData.doctor_id
-    setBillItems([
-      { particular: 'Room Charges', department: 'General', doctor_id: doctorId, amount: 0, discount_percent: 0, discount_amount: 0, total: 0 },
-      { particular: 'Doctor Fees', department: 'General', doctor_id: doctorId, amount: 0, discount_percent: 0, discount_amount: 0, total: 0 },
-      { particular: 'Medicine', department: 'Pharmacy', doctor_id: doctorId, amount: 0, discount_percent: 0, discount_amount: 0, total: 0 }
-    ])
-    
+    const defaultItems = billPurticularsnDepts.map(PnD => ({
+      particular: PnD.particular,
+      department: PnD.department,
+      doctor_id: doctorId,
+      amount: 0,
+      discount_percent: 0,
+      discount_amount: 0,
+      total: 0
+    }))
+    setBillItems(defaultItems)
+
     toast('Ready to create new bill', {
       icon: '📝',
       duration: 2000
@@ -361,14 +466,14 @@ const IPBillEntry = () => {
   const handleBillItemChange = (index: number, field: keyof BillItem, value: any) => {
     const newItems = [...billItems]
     newItems[index] = { ...newItems[index], [field]: value }
-    
+
     if (field === 'amount' || field === 'discount_percent') {
       const item = newItems[index]
       const discount = item.amount * (item.discount_percent / 100)
       item.discount_amount = discount
       item.total = item.amount - discount
     }
-    
+
     setBillItems(newItems)
   }
 
@@ -381,9 +486,11 @@ const IPBillEntry = () => {
   }
 
   const removeBillItem = (index: number) => {
-    if (billItems.length > 3) {
+    if (billItems.length > billPurticularsnDepts.length) {
       const newItems = billItems.filter((_, i) => i !== index)
       setBillItems(newItems)
+    } else {
+      toast.error('Cannot remove default bill items')
     }
   }
 
@@ -392,15 +499,370 @@ const IPBillEntry = () => {
     const totalDiscount = billItems.reduce((sum, item) => sum + item.discount_amount, 0)
     const subTotal = totalAmount - totalDiscount
     const netAmount = subTotal + billFormData.service_tax + billFormData.education_cess + billFormData.she_education_cess
-    
+
     return { totalAmount, totalDiscount, subTotal, netAmount }
   }
 
+  const handlePrintBill = () => {
+    // Calculate total safely
+    const calculateTotal = () => {
+      let total = 0;
+      billItems.forEach(item => {
+        const amount = typeof item.amount === 'string'
+          ? parseFloat(item.amount) || 0
+          : typeof item.amount === 'number'
+            ? item.amount
+            : 0;
+        total += amount;
+      });
+      return total.toFixed(2);
+    };
+
+    const totalAmount = calculateTotal();
+
+    // Create complete HTML document for printing
+    const printHTML = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Bill - ${patientFormData.name || 'Patient'}</title>
+          <meta charset="UTF-8">
+          <style>
+            @media print {
+              body { 
+                margin: 0; 
+                padding: 0;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+              }
+              @page { 
+                margin: 15mm;
+                /* Add these to remove header/footer */
+                margin-top: 0;
+                margin-bottom: 0;
+                size: auto;
+                /* Also try these vendor prefixes */
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+              }
+              .no-print { display: none !important; }
+            }
+            
+            @media screen {
+              body { 
+                background-color: #f3f4f6;
+                padding: 20px;
+              }
+              .print-container {
+                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+                background-color: white;
+                border-radius: 8px;
+              }
+            }
+            
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+              color: #374151;
+              line-height: 1.5;
+            }
+            
+            .header {
+              text-align: center;
+              margin-bottom: 30px;
+              padding-bottom: 20px;
+              border-bottom: 2px solid #e5e7eb;
+            }
+            
+            .header h1 {
+              font-size: 24px;
+              font-weight: bold;
+              color: #111827;
+              margin: 8px 0 0 0;
+            }
+            
+            .header .heading {
+              font-size: 20px;
+              font-weight: bold;
+              font-decoration: underline;
+              color: #111827;
+              margin: 8px 0 0 0;
+            }
+            
+            .header .subtitle {
+              font-size: 14px;
+              color: #6b7280;
+            }
+            
+            .patient-info {
+              background-color: #f9fafb;
+              border-radius: 6px;
+              padding: 16px;
+              margin-bottom: 24px;
+            }
+            
+            .patient-grid {
+              display: grid;
+              grid-template-columns: repeat(4, 1fr);
+              gap: 12px;
+              font-size: 14px;
+            }
+            
+            .patient-item {
+              display: flex;
+              flex-direction: column;
+            }
+            
+            .patient-label {
+              color: #4b5563;
+              font-size: 12px;
+              margin-bottom: 2px;
+            }
+            
+            .patient-value {
+              font-weight: 500;
+            }
+            
+            .room-icon {
+              display: inline-flex;
+              align-items: center;
+              margin-right: 4px;
+            }
+            
+            .bill-table {
+              width: 100%;
+              border-collapse: collapse;
+              font-size: 14px;
+              margin-top: 8px;
+            }
+            
+            .bill-table th {
+              background-color: #f9fafb;
+              padding: 12px;
+              text-align: left;
+              color: #4b5563;
+              font-weight: 600;
+              border-bottom: 2px solid #e5e7eb;
+            }
+            
+            .bill-table td {
+              padding: 12px;
+              border-bottom: 1px solid #e5e7eb;
+            }
+            
+            .bill-table tbody tr:last-child td {
+              border-bottom: none;
+            }
+            
+            .amount-column {
+              text-align: right;
+            }
+            
+            .total-row {
+              font-weight: bold;
+              background-color: #f3f4f6;
+            }
+            
+            .footer {
+              margin-top: 40px;
+              padding-top: 20px;
+              border-top: 1px solid #e5e7eb;
+              font-size: 12px;
+              color: #6b7280;
+            }
+            
+            .footer-content {
+              display: flex;
+              justify-content: space-between;
+            }
+            
+            .col-span-2 { grid-column: span 2; }
+            .col-span-4 { grid-column: span 4; }
+            
+            .section-title {
+              font-size: 16px;
+              font-weight: bold;
+              color: #374151;
+              margin-bottom: 12px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="print-container">
+            <!-- Header -->
+            <div class="header">
+                <h1>CITY NURSING HOME</h1>
+                <div class="subtitle">NORTH KOTACHERY</div>
+                <div class="subtitle">Phone: 202842, 202574, 2218153</div>
+                <div class="heading">CASH BILL</div>
+              </div>
+            
+            <!-- Patient Information -->
+            <div class="patient-info">
+              <div class="patient-grid">
+                <!-- Name -->
+                <div class="patient-item">
+                  <span class="patient-label">Name:</span>
+                  <span class="patient-value">${patientFormData.name || 'N/A'}</span>
+                </div>              
+                <!-- BillNo -->
+                <div class="patient-item">
+                  <span class="patient-label">Bill No:</span>
+                  <span class="patient-value">${billNumberRef.current}</span>
+                </div>              
+                
+                <!-- Doctor -->
+                <div class="patient-item">
+                  <span class="patient-label">Doctor:</span>
+                  <span class="patient-value">${doctors.filter(dr => dr.id == patientFormData.doctor_id).at(0)?.name || 'Not assigned'}</span>
+                </div>
+
+              </div>
+            </div>
+            
+            <!-- Bill Items -->
+            ${billItems.length > 0 ? `
+              <div style="margin-top: 24px;">
+                <div class="section-title">Bill Items</div>
+                <table class="bill-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Particular</th>
+                      <th>Department</th>
+                      <th class="amount-column">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${billItems.map((bi, index) => {
+      const displayAmount = typeof bi.amount === 'number'
+        ? bi.amount.toFixed(2)
+        : typeof bi.amount === 'string'
+          ? (parseFloat(bi.amount) || 0).toFixed(2)
+          : '0.00';
+
+      return `
+                        <tr>
+                          <td>${index + 1}</td>
+                          <td>${bi.particular || ''}</td>
+                          <td>${bi.department || ''}</td>
+                          <td class="amount-column">${displayAmount}</td>
+                        </tr>
+                      `;
+    }).join('')}
+                    
+                    <!-- Total Row -->
+                    <tr class="total-row">
+                      <td colspan="3" style="text-align: right; padding-right: 12px;">Total Amount:</td>
+                      <td class="amount-column">${totalAmount}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            ` : `
+              <div style="text-align: center; padding: 40px 20px; color: #6b7280; font-style: italic;">
+                No bill items to display
+              </div>
+            `}
+            
+            <!-- Footer -->
+            <div class="footer">
+              <div class="footer-content">
+                <div>
+                  <div>Printed: ${new Date().toLocaleDateString()}</div>
+                  <div style="margin-top: 4px;">Time: ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                </div>
+                <div style="text-align: right;">
+                  <div>Thank you for your visit</div>
+                  <div style="margin-top: 4px;">Page 1 of 1</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Print Button (only visible on screen) -->
+          <div class="no-print" style="margin-top: 20px; text-align: center;">
+            <button onclick="window.print()" style="
+              background-color: #3b82f6;
+              color: white;
+              padding: 10px 24px;
+              border: none;
+              border-radius: 6px;
+              font-weight: 500;
+              cursor: pointer;
+              font-size: 14px;
+            ">
+              Print Bill
+            </button>
+            <button onclick="window.close()" style="
+              background-color: #6b7280;
+              color: white;
+              padding: 10px 24px;
+              border: none;
+              border-radius: 6px;
+              font-weight: 500;
+              cursor: pointer;
+              font-size: 14px;
+              margin-left: 12px;
+            ">
+              Close
+            </button>
+          </div>
+          
+          <script>
+            // Close window after printing (if in iframe)
+            window.onafterprint = function() {
+              if (window.frameElement) {
+                setTimeout(function() {
+                  window.frameElement.remove();
+                }, 100);
+              }
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    // Create a hidden iframe for printing
+    const iframe = document.createElement('iframe');
+    iframe.name = 'print-iframe';
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = 'none';
+    iframe.style.visibility = 'hidden';
+
+    document.body.appendChild(iframe);
+
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+
+    if (iframeDoc) {
+      iframeDoc.open();
+      iframeDoc.write(printHTML);
+      iframeDoc.close();
+
+      // Wait for content to load
+      iframe.onload = () => {
+        // Focus the iframe for better print dialog behavior
+        iframe.contentWindow?.focus();
+
+        // Auto-print (optional - you can remove this if you want manual print button)
+        setTimeout(() => {
+          iframe.contentWindow?.print();
+        }, 1000);
+      };
+    } else {
+      console.error('Could not access iframe document');
+      alert('Could not prepare print document. Please try again.');
+    }
+  };
+
   const handleSaveBill = async () => {
     // If selected patient exists, update it, otherwise create new
-    if (!selectedPatient && (!patientFormData.name || !patientFormData.age || !patientFormData.gender || 
-        !patientFormData.complaint || !patientFormData.phone || !patientFormData.doctor_id ||
-        !patientFormData.room)) {
+    if (!selectedPatient && (!patientFormData.name || !patientFormData.age || !patientFormData.gender ||
+      !patientFormData.complaint || !patientFormData.phone || !patientFormData.doctor_id ||
+      !patientFormData.room)) {
       toast.error('Please fill all required patient details')
       return
     }
@@ -418,11 +880,11 @@ const IPBillEntry = () => {
     }
 
     setIsLoading(true)
-    
+
     try {
       let patientId = selectedPatient?.id
       let patientNumber = selectedPatient?.patient_number
-      
+
       // If no selected patient, create new
       if (!selectedPatient) {
         const patientData = {
@@ -439,11 +901,11 @@ const IPBillEntry = () => {
         patientNumber = patientResponse.data.patient_number
       }
 
-      // Create IP Bill
+      // Create IP Bill - use the persistent bill number
       const billData = {
         patient_id: patientId,
         patient_number: patientNumber,
-        bill_number: generateBillNumber(),
+        bill_number: billNumberRef.current, // Use the persistent bill number
         bill_type: billFormData.bill_type,
         category: billFormData.category,
         payment_mode: billFormData.payment_mode,
@@ -467,7 +929,7 @@ const IPBillEntry = () => {
       }
 
       await axios.post('/bills/ip', billData)
-      
+
       toast.success(`IP Bill created successfully! 
         Patient: ${patientNumber}
         Room: ${patientFormData.room}
@@ -475,7 +937,7 @@ const IPBillEntry = () => {
         Amount: ₹${netAmount.toFixed(2)}`)
 
       handleResetForms()
-      
+
     } catch (error: any) {
       toast.error(error.response?.data?.detail || 'Failed to save bill')
     } finally {
@@ -484,11 +946,14 @@ const IPBillEntry = () => {
   }
 
   const handleResetForms = () => {
+    // Generate new bill number only when resetting the form
+    billNumberRef.current = generateBillNumber()
+
     setSelectedPatient(null)
     setPreviousBills([])
     setCurrentBillIndex(-1)
     setShowPreviousBills(false)
-    
+
     setPatientFormData({
       name: '',
       age: '',
@@ -504,7 +969,7 @@ const IPBillEntry = () => {
       room: '',
       admission_date: format(new Date(), 'yyyy-MM-dd')
     })
-    
+
     setBillFormData({
       bill_type: 'Cash',
       category: 'General',
@@ -517,13 +982,20 @@ const IPBillEntry = () => {
       education_cess: 0,
       she_education_cess: 0
     })
-    
+
+    // Reset bill items using billPurticularsnDepts
     const doctorId = doctors[0]?.id || 0
-    setBillItems([
-      { particular: 'Room Charges', department: 'General', doctor_id: doctorId, amount: 0, discount_percent: 0, discount_amount: 0, total: 0 },
-      { particular: 'Doctor Fees', department: 'General', doctor_id: doctorId, amount: 0, discount_percent: 0, discount_amount: 0, total: 0 },
-      { particular: 'Medicine', department: 'Pharmacy', doctor_id: doctorId, amount: 0, discount_percent: 0, discount_amount: 0, total: 0 }
-    ])
+    const defaultItems = billPurticularsnDepts.map(PnD => ({
+      particular: PnD.particular,
+      department: PnD.department,
+      doctor_id: doctorId,
+      amount: 0,
+      discount_percent: 0,
+      discount_amount: 0,
+      total: 0
+    }))
+    setBillItems(defaultItems)
+
     setSearchQuery('')
     setShowSearchResults(false)
   }
@@ -540,7 +1012,7 @@ const IPBillEntry = () => {
             <div>
               <h1 className="text-xl font-bold">Inpatient Bill Entry</h1>
               <div className="text-sm text-purple-100 opacity-90">
-                Bill #: {generateBillNumber()} | Date: {format(new Date(), 'dd/MM/yyyy HH:mm')}
+                Bill #: {billNumberRef.current} | Date: {format(new Date(), 'dd/MM/yyyy HH:mm')}
               </div>
             </div>
           </div>
@@ -572,7 +1044,7 @@ const IPBillEntry = () => {
                 </button>
               </div>
             </div>
-            
+
             <div className="p-3">
               <div className="flex space-x-2">
                 <div className="flex-1">
@@ -703,7 +1175,7 @@ const IPBillEntry = () => {
                 </div>
                 <div>
                   <span className="text-gray-600">Doctor:</span>
-                  <span className="ml-2 font-medium">{selectedPatient.doctor_name}</span>
+                  <span className="ml-2 font-medium">{doctors.filter(dr => dr.id == selectedPatient.doctor_id).at(0)?.name}</span>
                 </div>
                 <div className="col-span-2">
                   <span className="text-gray-600">Address:</span>
@@ -743,7 +1215,7 @@ const IPBillEntry = () => {
                 </button>
               </div>
             </div>
-            
+
             {showPreviousBills && (
               <div className="p-3">
                 <div className="flex items-center justify-between mb-3">
@@ -761,7 +1233,7 @@ const IPBillEntry = () => {
                       </span>
                     )}
                   </div>
-                  
+
                   <div className="flex items-center space-x-2">
                     <button
                       onClick={handlePrevBill}
@@ -770,11 +1242,11 @@ const IPBillEntry = () => {
                     >
                       <ChevronLeft size={16} />
                     </button>
-                    
+
                     <div className="text-sm">
                       {currentBillIndex === -1 ? 'New' : `${currentBillIndex + 1} of ${previousBills.length}`}
                     </div>
-                    
+
                     <button
                       onClick={handleNextBill}
                       disabled={currentBillIndex >= previousBills.length - 1 || isLoadingBillDetails}
@@ -782,7 +1254,7 @@ const IPBillEntry = () => {
                     >
                       <ChevronRight size={16} />
                     </button>
-                    
+
                     {currentBillIndex !== -1 && (
                       <button
                         onClick={handleClearCurrentBill}
@@ -794,7 +1266,7 @@ const IPBillEntry = () => {
                     )}
                   </div>
                 </div>
-                
+
                 {/* Previous Bills List */}
                 <div className="border border-gray-200 rounded overflow-hidden">
                   <table className="w-full text-sm">
@@ -810,16 +1282,14 @@ const IPBillEntry = () => {
                     </thead>
                     <tbody>
                       {previousBills.map((bill, index) => (
-                        <tr 
-                          key={bill.id} 
-                          className={`border-t hover:bg-blue-50 ${
-                            currentBillIndex === index ? 'bg-blue-100' : ''
-                          }`}
+                        <tr
+                          key={bill.id}
+                          className={`border-t hover:bg-blue-50 ${currentBillIndex === index ? 'bg-blue-100' : ''
+                            }`}
                         >
                           <td className="px-3 py-2">
-                            <span className={`font-medium ${
-                              currentBillIndex === index ? 'text-blue-700' : 'text-gray-800'
-                            }`}>
+                            <span className={`font-medium ${currentBillIndex === index ? 'text-blue-700' : 'text-gray-800'
+                              }`}>
                               {bill.bill_number}
                             </span>
                           </td>
@@ -839,11 +1309,10 @@ const IPBillEntry = () => {
                             <button
                               onClick={() => handleLoadPreviousBill(index)}
                               disabled={isLoadingBillDetails}
-                              className={`px-3 py-1 text-xs rounded disabled:opacity-50 ${
-                                currentBillIndex === index
-                                  ? 'bg-blue-600 text-white'
-                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                              }`}
+                              className={`px-3 py-1 text-xs rounded disabled:opacity-50 ${currentBillIndex === index
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                }`}
                             >
                               {currentBillIndex === index ? 'Viewing' : 'View'}
                             </button>
@@ -864,7 +1333,7 @@ const IPBillEntry = () => {
             <div className="p-3 border-b border-gray-200 bg-purple-50">
               <h2 className="font-semibold text-gray-900">New Inpatient Details</h2>
             </div>
-            
+
             <div className="p-3">
               <div className="grid grid-cols-4 gap-3">
                 {/* Row 1 */}
@@ -873,28 +1342,28 @@ const IPBillEntry = () => {
                   <input
                     type="text"
                     value={patientFormData.name}
-                    onChange={(e) => setPatientFormData({...patientFormData, name: e.target.value})}
+                    onChange={(e) => setPatientFormData({ ...patientFormData, name: e.target.value })}
                     className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
                     placeholder="Full name"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Age *</label>
                   <input
                     type="text"
                     value={patientFormData.age}
-                    onChange={(e) => setPatientFormData({...patientFormData, age: e.target.value})}
+                    onChange={(e) => setPatientFormData({ ...patientFormData, age: e.target.value })}
                     className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
                     placeholder="Years"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Gender *</label>
                   <select
                     value={patientFormData.gender}
-                    onChange={(e) => setPatientFormData({...patientFormData, gender: e.target.value as any})}
+                    onChange={(e) => setPatientFormData({ ...patientFormData, gender: e.target.value as any })}
                     className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
                   >
                     <option value="Male">Male</option>
@@ -902,13 +1371,13 @@ const IPBillEntry = () => {
                     <option value="Other">Other</option>
                   </select>
                 </div>
-                
+
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Room/Ward *</label>
                   <input
                     type="text"
                     value={patientFormData.room}
-                    onChange={(e) => setPatientFormData({...patientFormData, room: e.target.value})}
+                    onChange={(e) => setPatientFormData({ ...patientFormData, room: e.target.value })}
                     className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
                     placeholder="ICU-101"
                   />
@@ -920,43 +1389,43 @@ const IPBillEntry = () => {
                   <input
                     type="date"
                     value={patientFormData.admission_date}
-                    onChange={(e) => setPatientFormData({...patientFormData, admission_date: e.target.value})}
+                    onChange={(e) => setPatientFormData({ ...patientFormData, admission_date: e.target.value })}
                     className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Phone *</label>
                   <input
                     type="tel"
                     value={patientFormData.phone}
-                    onChange={(e) => setPatientFormData({...patientFormData, phone: e.target.value})}
+                    onChange={(e) => setPatientFormData({ ...patientFormData, phone: e.target.value })}
                     className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
                     placeholder="Mobile"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Email</label>
                   <input
                     type="email"
                     value={patientFormData.email}
-                    onChange={(e) => setPatientFormData({...patientFormData, email: e.target.value})}
+                    onChange={(e) => setPatientFormData({ ...patientFormData, email: e.target.value })}
                     className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
                     placeholder="Email"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Doctor *</label>
                   <select
                     value={patientFormData.doctor_id}
-                    onChange={(e) => setPatientFormData({...patientFormData, doctor_id: parseInt(e.target.value)})}
+                    onChange={(e) => setPatientFormData({ ...patientFormData, doctor_id: parseInt(e.target.value) })}
                     className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
                   >
                     <option value="">Select</option>
                     {doctors.map(doctor => (
-                      <option key={doctor.id} value={doctor.id}>Dr. {doctor.name}</option>
+                      <option key={doctor.id} value={doctor.id}>{doctor.name}</option>
                     ))}
                   </select>
                 </div>
@@ -967,40 +1436,40 @@ const IPBillEntry = () => {
                   <input
                     type="text"
                     value={patientFormData.house}
-                    onChange={(e) => setPatientFormData({...patientFormData, house: e.target.value})}
+                    onChange={(e) => setPatientFormData({ ...patientFormData, house: e.target.value })}
                     className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
                     placeholder="House"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Street</label>
                   <input
                     type="text"
                     value={patientFormData.street}
-                    onChange={(e) => setPatientFormData({...patientFormData, street: e.target.value})}
+                    onChange={(e) => setPatientFormData({ ...patientFormData, street: e.target.value })}
                     className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
                     placeholder="Street"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Place *</label>
                   <input
                     type="text"
                     value={patientFormData.place}
-                    onChange={(e) => setPatientFormData({...patientFormData, place: e.target.value})}
+                    onChange={(e) => setPatientFormData({ ...patientFormData, place: e.target.value })}
                     className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
                     placeholder="City"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Referred By</label>
                   <input
                     type="text"
                     value={patientFormData.referred_by}
-                    onChange={(e) => setPatientFormData({...patientFormData, referred_by: e.target.value})}
+                    onChange={(e) => setPatientFormData({ ...patientFormData, referred_by: e.target.value })}
                     className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
                     placeholder="Referred by"
                   />
@@ -1012,7 +1481,7 @@ const IPBillEntry = () => {
                   <input
                     type="text"
                     value={patientFormData.complaint}
-                    onChange={(e) => setPatientFormData({...patientFormData, complaint: e.target.value})}
+                    onChange={(e) => setPatientFormData({ ...patientFormData, complaint: e.target.value })}
                     className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
                     placeholder="Patient complaint"
                   />
@@ -1032,27 +1501,27 @@ const IPBillEntry = () => {
                   <input
                     type="checkbox"
                     checked={billFormData.is_insurance}
-                    onChange={(e) => setBillFormData({...billFormData, is_insurance: e.target.checked})}
+                    onChange={(e) => setBillFormData({ ...billFormData, is_insurance: e.target.checked })}
                     className="w-4 h-4"
                   />
                   <label className="text-sm text-gray-600">Insurance</label>
                 </div>
-                
+
                 <div className="flex items-center space-x-2">
                   <input
                     type="checkbox"
                     checked={billFormData.is_credit}
-                    onChange={(e) => setBillFormData({...billFormData, is_credit: e.target.checked})}
+                    onChange={(e) => setBillFormData({ ...billFormData, is_credit: e.target.checked })}
                     className="w-4 h-4"
                   />
                   <label className="text-sm text-gray-600">Credit</label>
                 </div>
-                
+
                 <div className="text-sm">
                   <label className="text-gray-600 mr-2">Category:</label>
                   <select
                     value={billFormData.category}
-                    onChange={(e) => setBillFormData({...billFormData, category: e.target.value})}
+                    onChange={(e) => setBillFormData({ ...billFormData, category: e.target.value })}
                     className="px-2 py-1 border border-gray-300 rounded text-sm"
                   >
                     <option value="General">General</option>
@@ -1063,7 +1532,7 @@ const IPBillEntry = () => {
               </div>
             </div>
           </div>
-          
+
           <div className="p-3">
             {/* Insurance Details */}
             {billFormData.is_insurance && (
@@ -1074,7 +1543,7 @@ const IPBillEntry = () => {
                     <input
                       type="text"
                       value={billFormData.insurance_company}
-                      onChange={(e) => setBillFormData({...billFormData, insurance_company: e.target.value})}
+                      onChange={(e) => setBillFormData({ ...billFormData, insurance_company: e.target.value })}
                       className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
                       placeholder="Company"
                     />
@@ -1084,7 +1553,7 @@ const IPBillEntry = () => {
                     <input
                       type="text"
                       value={billFormData.policy_number}
-                      onChange={(e) => setBillFormData({...billFormData, policy_number: e.target.value})}
+                      onChange={(e) => setBillFormData({ ...billFormData, policy_number: e.target.value })}
                       className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
                       placeholder="Policy number"
                     />
@@ -1113,26 +1582,42 @@ const IPBillEntry = () => {
                     <tr key={index} className="hover:bg-gray-50">
                       <td className="px-2 py-1.5 border text-center">{index + 1}</td>
                       <td className="px-2 py-1.5 border">
-                        <input
-                          type="text"
-                          value={item.particular}
-                          onChange={(e) => handleBillItemChange(index, 'particular', e.target.value)}
-                          className="w-full px-1 py-0.5 border border-gray-300 rounded text-xs"
-                          placeholder="Particular"
-                        />
+                        <div className="relative">
+                          <select
+                            value={item.particular}
+                            onChange={(e) => handleBillItemChange(index, 'particular', e.target.value)}
+                            className="w-full px-1 py-0.5 border border-gray-300 rounded text-xs appearance-none pr-6"
+                          >
+                            <option value="">Select Particular</option>
+                            {PARTICULAR_ITEMS.map((particular, idx) => (
+                              <option key={idx} value={particular}>
+                                {particular}
+                              </option>
+                            ))}
+                          </select>
+                          <ChevronDown className="absolute right-1 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" size={12} />
+                        </div>
+                      </td>
+                      <td className="px-2 py-1.5 border">
+                        <div className="relative">
+                          <select
+                            value={item.department}
+                            onChange={(e) => handleBillItemChange(index, 'department', e.target.value)}
+                            className="w-full px-1 py-0.5 border border-gray-300 rounded text-xs appearance-none pr-6"
+                          >
+                            <option value="">Select Department</option>
+                            {DEPARTMENTS.map((department, idx) => (
+                              <option key={idx} value={department}>
+                                {department}
+                              </option>
+                            ))}
+                          </select>
+                          <ChevronDown className="absolute right-1 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" size={12} />
+                        </div>
                       </td>
                       <td className="px-2 py-1.5 border">
                         <input
                           type="text"
-                          value={item.department}
-                          onChange={(e) => handleBillItemChange(index, 'department', e.target.value)}
-                          className="w-full px-1 py-0.5 border border-gray-300 rounded text-xs"
-                          placeholder="Department"
-                        />
-                      </td>
-                      <td className="px-2 py-1.5 border">
-                        <input
-                          type="number"
                           value={item.amount}
                           onChange={(e) => handleBillItemChange(index, 'amount', parseFloat(e.target.value) || 0)}
                           className="w-full px-1 py-0.5 border border-gray-300 rounded text-xs text-center"
@@ -1140,7 +1625,7 @@ const IPBillEntry = () => {
                       </td>
                       <td className="px-2 py-1.5 border">
                         <input
-                          type="number"
+                          type="text"
                           value={item.discount_percent}
                           onChange={(e) => handleBillItemChange(index, 'discount_percent', parseFloat(e.target.value) || 0)}
                           className="w-full px-1 py-0.5 border border-gray-300 rounded text-xs text-center"
@@ -1154,7 +1639,7 @@ const IPBillEntry = () => {
                         ₹{item.total.toFixed(2)}
                       </td>
                       <td className="px-2 py-1.5 border text-center">
-                        {billItems.length > 3 && (
+                        {billItems.length > billPurticularsnDepts.length && (
                           <button
                             onClick={() => removeBillItem(index)}
                             className="text-red-500 hover:text-red-700 text-sm"
@@ -1168,7 +1653,7 @@ const IPBillEntry = () => {
                 </tbody>
               </table>
             </div>
-            
+
             <div className="flex justify-between items-center mt-3">
               <button
                 onClick={addBillItem}
@@ -1176,7 +1661,7 @@ const IPBillEntry = () => {
               >
                 + Add Item
               </button>
-              
+
               <div className="text-right">
                 <div className="flex items-center space-x-4 text-sm">
                   <div className="text-gray-600">
@@ -1201,30 +1686,30 @@ const IPBillEntry = () => {
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Service Tax</label>
                   <input
-                    type="number"
+                    type="text"
                     step="0.01"
                     value={billFormData.service_tax}
-                    onChange={(e) => setBillFormData({...billFormData, service_tax: parseFloat(e.target.value) || 0})}
+                    onChange={(e) => setBillFormData({ ...billFormData, service_tax: parseFloat(e.target.value) || 0 })}
                     className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
                   />
                 </div>
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Ed. Cess</label>
                   <input
-                    type="number"
+                    type="text"
                     step="0.01"
                     value={billFormData.education_cess}
-                    onChange={(e) => setBillFormData({...billFormData, education_cess: parseFloat(e.target.value) || 0})}
+                    onChange={(e) => setBillFormData({ ...billFormData, education_cess: parseFloat(e.target.value) || 0 })}
                     className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
                   />
                 </div>
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">SH Ed. Cess</label>
                   <input
-                    type="number"
+                    type="text"
                     step="0.01"
                     value={billFormData.she_education_cess}
-                    onChange={(e) => setBillFormData({...billFormData, she_education_cess: parseFloat(e.target.value) || 0})}
+                    onChange={(e) => setBillFormData({ ...billFormData, she_education_cess: parseFloat(e.target.value) || 0 })}
                     className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
                   />
                 </div>
@@ -1249,7 +1734,7 @@ const IPBillEntry = () => {
                 'Enter inpatient details or search existing inpatient'
               )}
             </div>
-            
+
             <div className="flex space-x-2">
               <button
                 onClick={handleResetForms}
@@ -1257,14 +1742,14 @@ const IPBillEntry = () => {
               >
                 Clear All
               </button>
-              
+
               <button
-                onClick={() => window.print()}
+                onClick={() => handlePrintBill()}
                 className="px-4 py-2 border border-blue-300 text-blue-700 text-sm rounded hover:bg-blue-50"
               >
                 Print
               </button>
-              
+
               <button
                 onClick={handleSaveBill}
                 disabled={isLoading}

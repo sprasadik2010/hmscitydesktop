@@ -1,15 +1,7 @@
-import sys
-import os
-from pathlib import Path
 from sqlalchemy.orm import Session
-
-# Add the parent directory to Python path so we can import correctly
-current_dir = Path(__file__).parent
-sys.path.insert(0, str(current_dir))
-
-from database import SessionLocal, engine, create_tables
-from app.models.models import Base, User, Doctor
-from app.auth import get_password_hash
+from database import SessionLocal, engine
+from models import Base, User, Doctor
+from auth import get_password_hash
 
 def create_admin_user():
     db = SessionLocal()
@@ -25,15 +17,13 @@ def create_admin_user():
             )
             db.add(admin_user)
             db.commit()
-            print("✓ Admin user created: admin/admin123")
-        else:
-            print("✓ Admin user already exists")
-
+            print("Admin user created: admin/admin123")
+        
         # Create sample doctors
         doctors = [
             Doctor(
                 code="DR001",
-                name="Dr. John Smith",
+                name="John Smith",
                 address="123 Medical Center, City",
                 qualification="MBBS, MD",
                 phone="9876543210",
@@ -52,7 +42,7 @@ def create_admin_user():
             ),
             Doctor(
                 code="DR002",
-                name="Dr. Sarah Johnson",
+                name="Sarah Johnson",
                 address="456 Health Street, Town",
                 qualification="MBBS, MS",
                 phone="9876543211",
@@ -71,7 +61,7 @@ def create_admin_user():
             ),
             Doctor(
                 code="DR003",
-                name="Dr. Michael Brown",
+                name="Michael Brown",
                 address="789 Care Avenue, Village",
                 qualification="MBBS, DCH",
                 phone="9876543212",
@@ -90,44 +80,21 @@ def create_admin_user():
             )
         ]
         
-        doctors_created = 0
         for doctor in doctors:
             existing = db.query(Doctor).filter(Doctor.code == doctor.code).first()
             if not existing:
                 db.add(doctor)
-                doctors_created += 1
         
         db.commit()
-        if doctors_created > 0:
-            print(f"✓ Created {doctors_created} sample doctors")
-        else:
-            print("✓ Sample doctors already exist")
+        print("Sample doctors created")
         
     except Exception as e:
-        print(f"✗ Error seeding data: {e}")
-        db.rollback()
-        raise
+        print(f"Error: {e}")
     finally:
         db.close()
 
-def init_database():
-    """Initialize database with tables and seed data"""
-    print("=" * 50)
-    print("Initializing HMS Database")
-    print("=" * 50)
-    
-    # Create tables
-    print("\n1. Creating database tables...")
-    create_tables()
-    print("   ✓ Tables created successfully")
-    
-    # Create admin user and sample data
-    print("\n2. Seeding initial data...")
-    create_admin_user()
-    
-    print("\n" + "=" * 50)
-    print("Database initialization complete!")
-    print("=" * 50)
-
 if __name__ == "__main__":
-    init_database()
+    # Create tables
+    Base.metadata.create_all(bind=engine)
+    # Create admin user and sample data
+    create_admin_user()

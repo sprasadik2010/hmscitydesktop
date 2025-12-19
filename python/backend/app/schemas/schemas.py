@@ -112,6 +112,7 @@ class OPBillItemResponse(OPBillItemCreate):
 
 class IPBillItemCreate(BaseModel):
     particular: str
+    # doctor: str
     department: str
     amount: float
     discount_percent: float = 0
@@ -199,34 +200,12 @@ class IPBillResponse(BaseModel):
     class Config:
         from_attributes = True
 
-# Appointment Schemas
-class AppointmentBase(BaseModel):
-    appointment_date: datetime
-    patient_id: int
-    doctor_id: int
-    token_number: int
-    notes: Optional[str] = None
-
-class AppointmentCreate(AppointmentBase):
-    pass
-
-class AppointmentResponse(AppointmentBase):
-    id: int
-    status: str
-    created_at: datetime
-    patient_name: Optional[str] = None
-    doctor_name: Optional[str] = None
-    
-    class Config:
-        from_attributes = True
-
 # Dashboard Schemas
 class DashboardStats(BaseModel):
     total_patients_today: int
     total_op_bills_today: int
     total_ip_bills_today: int
     total_revenue_today: float
-    pending_appointments: int
 
 # Report Schemas
 class DailyOPReport(BaseModel):

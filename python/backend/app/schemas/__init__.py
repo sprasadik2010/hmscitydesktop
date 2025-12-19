@@ -5,7 +5,6 @@ from .schemas import (
     PatientCreate, PatientResponse,
     OPBillCreate, OPBillResponse,
     IPBillCreate, IPBillResponse,
-    AppointmentCreate, AppointmentResponse,
     DashboardStats,
     OPBillItemCreate, OPBillItemResponse,
     IPBillItemCreate, IPBillItemResponse
@@ -18,7 +17,6 @@ __all__ = [
     "PatientCreate", "PatientResponse",
     "OPBillCreate", "OPBillResponse",
     "IPBillCreate", "IPBillResponse",
-    "AppointmentCreate", "AppointmentResponse",
     "DashboardStats",
     "OPBillItemCreate", "OPBillItemResponse",
     "IPBillItemCreate", "IPBillItemResponse"

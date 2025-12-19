@@ -44,7 +44,6 @@ class Doctor(Base):
     
     # Relationships
     patients = relationship("Patient", back_populates="doctor")
-    appointments = relationship("Appointment", back_populates="doctor")
     op_bills = relationship("OPBill", back_populates="doctor")
     ip_bills = relationship("IPBill", back_populates="doctor")
 
@@ -74,7 +73,6 @@ class Patient(Base):
     doctor = relationship("Doctor", back_populates="patients")
     op_bills = relationship("OPBill", back_populates="patient")
     ip_bills = relationship("IPBill", back_populates="patient")
-    appointments = relationship("Appointment", back_populates="patient")
 
 class OPBill(Base):
     __tablename__ = "op_bills"
@@ -85,6 +83,7 @@ class OPBill(Base):
     patient_id = Column(Integer, ForeignKey("patients.id"))
     bill_type = Column(String(20))
     category = Column(String(50))
+    doctor = Column(String(100))
     doctor_id = Column(Integer, ForeignKey("doctors.id"))
     discount_type = Column(String(50))
     total_amount = Column(Float, default=0)
@@ -104,7 +103,7 @@ class OPBillItem(Base):
     id = Column(Integer, primary_key=True, index=True)
     bill_id = Column(Integer, ForeignKey("op_bills.id"))
     particular = Column(String(200))
-    # doctor = Column(String(100))
+    doctor = Column(String(100))
     doctor_id = Column(Integer, ForeignKey("doctors.id"))
     department = Column(String(100))
     unit = Column(Integer, default=1)
@@ -162,19 +161,3 @@ class IPBillItem(Base):
     
     # Relationships
     bill = relationship("IPBill", back_populates="items")
-
-class Appointment(Base):
-    __tablename__ = "appointments"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    appointment_date = Column(DateTime)
-    patient_id = Column(Integer, ForeignKey("patients.id"))
-    doctor_id = Column(Integer, ForeignKey("doctors.id"))
-    token_number = Column(Integer)
-    status = Column(String(20), default="Scheduled")
-    notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    
-    # Relationships
-    patient = relationship("Patient", back_populates="appointments")
-    doctor = relationship("Doctor", back_populates="appointments")
