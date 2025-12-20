@@ -128,23 +128,10 @@ const Reports = () => {
     fetchParticularsList()
   }, [])
 
-  const handlePrint = () => {
-    window.print()
-  }
+  //  const handlePrint = () => {
+  //   window.print();   
+  //   };
 
-  const handleExport = () => {
-    if (!reportData) return
-
-    const dataStr = JSON.stringify(reportData, null, 2)
-    const dataBlob = new Blob([dataStr], { type: 'application/json' })
-    const url = URL.createObjectURL(dataBlob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `${activeReport}-${format(new Date(), 'yyyy-MM-dd')}.json`
-    link.click()
-    URL.revokeObjectURL(url)
-    toast.success('Report exported successfully')
-  }
 
   const getTotalRevenue = () => {
     if (!reportData) return 0
@@ -159,6 +146,440 @@ const Reports = () => {
       return reportData.total_amount || 0
     }
     return 0
+  }
+
+  const handlePrint = () => {
+    let title
+    let totalBills = getRecordCount()
+    let totalRevenue = getTotalRevenue().toFixed(2)
+    switch (activeReport) {
+      case 'daily-op':
+        console.log(reportData)
+        title = 'OP Report'
+        break
+
+      case 'bill-summary':
+        title = 'IP/OP Bill Summary Report'
+        break
+
+      case 'patient-list':
+        title = 'Patient List'
+        break
+
+      case 'particulars-report':
+        title = particularName + ' Summary Report'
+        break
+
+      default:
+        title = ''
+    }
+    // Create complete HTML document for printing
+  let printHTML = `
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Daily OP Report - ${startDate + '-' + endDate || 'Report'}</title>
+    <meta charset="UTF-8">
+    <style>
+      @media print {
+        body { 
+          margin: 0; 
+          padding: 0;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
+        @page { 
+          margin: 15mm;
+          margin-top: 0;
+          margin-bottom: 0;
+          size: auto;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
+        .no-print { display: none !important; }
+        .print-break { page-break-inside: avoid; }
+      }
+      
+      @media screen {
+        body { 
+          background-color: #f3f4f6;
+          padding: 20px;
+        }
+        .print-container {
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+          background-color: white;
+          border-radius: 8px;
+          text-align: center;
+          justify-items: center;
+          width:50%
+        }
+      }
+      
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        color: #374151;
+        line-height: 1.4;
+      }
+      
+      .report-header {
+        text-align: center;
+        margin-top: 50px;
+        margin-bottom: 30px;
+        padding-bottom: 20px;
+        border-bottom: 2px solid #e5e7eb;
+      }
+      
+      .report-header h1 {
+        font-size: 28px;
+        font-weight: bold;
+        color: #111827;
+        margin: 0 0 8px 0;
+      }
+      
+      .report-header .subtitle {
+        font-size: 16px;
+        color: #6b7280;
+      }
+      
+      .report-period {
+        font-size: 18px;
+        font-weight: 600;
+        color: #374151;
+        margin: 15px 0;
+      }
+      
+      .op-summary-stats {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 20px;
+        margin-bottom: 30px;
+        // justify-items: center;
+      }
+      
+      .revenue-report-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+        margin-bottom: 30px;
+        // justify-items: center;
+      }
+      
+      .stat-card {
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 20px;
+        text-align: center;
+      }
+      
+      .stat-card.blue {
+        background-color: #f0f9ff;
+        border-color: #bae6fd;
+      }
+      
+      .stat-card.green {
+        background-color: #f0fdf4;
+        border-color: #bbf7d0;
+      }
+      
+      .stat-card.yellow {
+        background-color: #fefce8;
+        border-color: #fef08a;
+      }
+      
+      .stat-card.purple {
+        background-color: #faf5ff;
+        border-color: #e9d5ff;
+      }
+      
+      .stat-label {
+        font-size: 14px;
+        color: #6b7280;
+        margin-bottom: 8px;
+      }
+      
+      .stat-value {
+        font-size: 24px;
+        font-weight: bold;
+        color: #111827;
+      }
+      
+      .data-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 25px 0;
+        font-size: 14px;
+      }
+      
+      .data-table th {
+        background-color: #f9fafb;
+        padding: 12px;
+        text-align: left;
+        color: #4b5563;
+        font-weight: 600;
+        border-bottom: 2px solid #e5e7eb;
+        border-top: 1px solid #e5e7eb;
+      }
+      
+      .data-table td {
+        padding: 12px;
+        border-bottom: 1px solid #e5e7eb;
+      }
+      
+      .data-table tbody tr:last-child td {
+        border-bottom: none;
+      }
+      
+      .amount-column {
+        text-align: right;
+      }
+      
+      .bill-type {
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 500;
+      }
+      
+      .bill-type.cash {
+        background-color: #d1fae5;
+        color: #065f46;
+      }
+      
+      .bill-type.insurance {
+        background-color: #ede9fe;
+        color: #5b21b6;
+      }
+      
+      .report-footer {
+        margin-top: 40px;
+        padding-top: 20px;
+        border-top: 2px solid #e5e7eb;
+        font-size: 14px;
+        color: #6b7280;
+      }
+      
+      .footer-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+      }
+      
+      .footer-item {
+        display: flex;
+        flex-direction: column;
+      }
+      
+      .footer-label {
+        color: #4b5563;
+        font-size: 13px;
+        margin-bottom: 4px;
+      }
+      
+      .footer-value {
+        font-weight: 600;
+        font-size: 16px;
+      }
+      
+      .total-revenue {
+        font-weight: bold;
+        color: #059669;
+        font-size: 20px;
+      }
+      
+      .generated-info {
+        margin-top: 20px;
+        padding-top: 10px;
+        border-top: 1px solid #e5e7eb;
+        font-size: 12px;
+        text-align: center;
+      }
+      
+      .section-title {
+        font-size: 18px;
+        font-weight: bold;
+        color: #374151;
+        margin-bottom: 15px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #e5e7eb;
+      }
+      
+      .filter-info {
+        background-color: #f9fafb;
+        border-radius: 6px;
+        padding: 15px;
+        margin-bottom: 20px;
+        font-size: 14px;
+      }
+        
+      .filter-grid {
+        display: flex;
+        justify-content: space-between; /* ← key line */
+        align-items: center;
+        width: 100%;
+      }
+
+      .filter-item {
+        display: flex;
+        gap: 6px;
+        white-space: nowrap;
+      }
+      
+      .filter-label {
+        color: #4b5563;
+        font-size: 13px;
+        margin-bottom: 2px;
+      }
+      
+      .filter-value {
+        font-weight: 500;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="print-container">
+      <!-- Report Header -->
+      <div class="report-header">
+        <h1>CITY NURSING HOME</h1>
+        <h2>${title}</h2>
+        <div class="subtitle">NORTH KOTACHERY</div>
+        <div class="subtitle">Phone: 202842, 202574, 2218153</div>
+        <div class="report-period">
+          Generated for period: ${startDate ? new Date(startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A'} - ${endDate ? new Date(endDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A'}
+        </div>
+      </div>
+      
+      <!-- Filter Information -->
+      <div class="filter-info">
+        <div class="filter-grid">
+          <div class="filter-item">
+            <span class="filter-label">Start Date:</span>
+            <span class="filter-value">${startDate || 'N/A'}</span>
+          </div>
+          <div class="filter-item">
+            <span class="filter-label">End Date:</span>
+            <span class="filter-value">${endDate || 'N/A'}</span>
+          </div>
+          <div class="filter-item">
+            <span class="filter-label">Report Type:</span>
+            <span class="filter-value">${title}</span>
+          </div>          
+        </div>
+      </div>
+      `;
+      if(activeReport === 'daily-op')
+          {      
+            printHTML += `
+            <!-- OP Summary Statistics -->
+                <div class="section-title">Summary Overview</div>
+                <div class="op-summary-stats">
+                  <div class="stat-card blue">
+                    <div class="stat-label">Total Bills</div>
+                    <div class="stat-value">${totalBills || 0}</div>
+                  </div>
+                  <div class="stat-card green">
+                    <div class="stat-label">Total Revenue</div>
+                    <div class="stat-value">₹${totalRevenue}</div>
+                  </div>
+                </div>`
+              }
+        else if(activeReport === 'bill-summary')
+          {      
+            printHTML += `
+            <!-- OP Summary Statistics -->
+                <div class="section-title">Summary Overview</div>
+                <div class="revenue-report-stats">
+                  <div class="stat-card blue">
+                    <div class="stat-label">Total OP Revenue</div>
+                    <div class="stat-value">₹${reportData?.total_op_amount?.toFixed(2) || '0.00'}</div>
+                  </div>
+                  <div class="stat-card purple">
+                    <div class="stat-label">Total IP Revenue</div>
+                    <div class="stat-value">₹${reportData?.total_ip_amount?.toFixed(2) || '0.00'}</div>
+                  </div>
+                  <div class="stat-card green">
+                    <div class="stat-label">Total Revenue</div>
+                    <div class="stat-value">₹${reportData?.total_amount?.toFixed(2) || '0.00'}</div>
+                  </div>
+                </div>`
+              }
+        else if(activeReport === 'patient-list')
+          {      
+            printHTML += `
+            <!-- OP Summary Statistics -->
+                <div class="section-title">Summary Overview</div>
+                <div class="revenue-report-stats">
+                  <div class="stat-card blue">
+                    <div class="stat-label">Total OP Revenue</div>
+                    <div class="stat-value">₹${reportData?.total_op_amount?.toFixed(2) || '0.00'}</div>
+                  </div>
+                  <div class="stat-card purple">
+                    <div class="stat-label">Total IP Revenue</div>
+                    <div class="stat-value">₹${reportData?.total_ip_amount?.toFixed(2) || '0.00'}</div>
+                  </div>
+                  <div class="stat-card green">
+                    <div class="stat-label">Total Revenue</div>
+                    <div class="stat-value">₹${reportData?.total_amount?.toFixed(2) || '0.00'}</div>
+                  </div>
+                </div>`
+              }
+        printHTML == `<div class="generated-info">
+          Report generated on ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })} at ${new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
+`
+
+    // Create a hidden iframe for printing
+    const iframe = document.createElement('iframe');
+    iframe.name = 'print-iframe';
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = 'none';
+    iframe.style.visibility = 'hidden';
+
+    document.body.appendChild(iframe);
+
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+
+    if (iframeDoc) {
+      iframeDoc.open();
+      iframeDoc.write(printHTML);
+      iframeDoc.close();
+
+      // Wait for content to load
+      iframe.onload = () => {
+        // Focus the iframe for better print dialog behavior
+        iframe.contentWindow?.focus();
+
+        // Auto-print (optional - you can remove this if you want manual print button)
+        setTimeout(() => {
+          iframe.contentWindow?.print();
+        }, 1000);
+      };
+    } else {
+      console.error('Could not access iframe document');
+      alert('Could not prepare print document. Please try again.');
+    }
+  };
+
+
+  const handleExport = () => {
+    if (!reportData) return
+
+    const dataStr = JSON.stringify(reportData, null, 2)
+    const dataBlob = new Blob([dataStr], { type: 'application/json' })
+    const url = URL.createObjectURL(dataBlob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${activeReport}-${format(new Date(), 'yyyy-MM-dd')}.json`
+    link.click()
+    URL.revokeObjectURL(url)
+    toast.success('Report exported successfully')
   }
 
   const getRecordCount = () => {
@@ -532,9 +953,9 @@ const Reports = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-3 py-1 text-xs font-medium rounded-full ${bill.bill_type === 'Cash' ? 'bg-green-100 text-green-800' :
-                            bill.bill_type === 'Insurance' ? 'bg-blue-100 text-blue-800' :
-                              bill.bill_type === 'Card' ? 'bg-purple-100 text-purple-800' :
-                                'bg-gray-100 text-gray-800'
+                          bill.bill_type === 'Insurance' ? 'bg-blue-100 text-blue-800' :
+                            bill.bill_type === 'Card' ? 'bg-purple-100 text-purple-800' :
+                              'bg-gray-100 text-gray-800'
                           }`}>
                           {bill.bill_type}
                         </span>
@@ -632,8 +1053,8 @@ const Reports = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-3 py-1 text-xs font-medium rounded-full flex items-center w-16 justify-center ${bill.bill_number?.startsWith('OP')
-                            ? 'bg-blue-100 text-blue-800'
-                            : 'bg-purple-100 text-purple-800'
+                          ? 'bg-blue-100 text-blue-800'
+                          : 'bg-purple-100 text-purple-800'
                           }`}>
                           {bill.bill_number?.startsWith('OP') ? 'OP' : 'IP'}
                         </span>
@@ -747,8 +1168,8 @@ const Reports = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-3 py-1 text-xs font-medium rounded-full ${patient.is_ip
-                            ? 'bg-purple-100 text-purple-800'
-                            : 'bg-blue-100 text-blue-800'
+                          ? 'bg-purple-100 text-purple-800'
+                          : 'bg-blue-100 text-blue-800'
                           }`}>
                           {patient.is_ip ? 'INPATIENT' : 'OUTPATIENT'}
                         </span>
@@ -800,8 +1221,8 @@ const Reports = () => {
                 key={report.id}
                 onClick={() => setActiveReport(report.id)}
                 className={`rounded-2xl p-5 text-left transition-all transform hover:-translate-y-1 ${isActive
-                    ? `${report.color} text-white shadow-xl`
-                    : 'bg-white/10 backdrop-blur-sm text-white/90 hover:bg-white/20'
+                  ? `${report.color} text-white shadow-xl`
+                  : 'bg-white/10 backdrop-blur-sm text-white/90 hover:bg-white/20'
                   }`}
               >
                 <div className="flex items-center justify-between mb-4">
