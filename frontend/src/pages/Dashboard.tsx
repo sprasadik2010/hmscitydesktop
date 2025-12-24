@@ -5,6 +5,7 @@ import {
   FileText, 
   ClipboardList, 
   TrendingUp,
+  Settings,
   Stethoscope,
   Hospital,
   Clock,
@@ -90,6 +91,14 @@ const Dashboard = () => {
       color: 'bg-gradient-to-br from-indigo-500 to-indigo-600',
       gradient: 'from-indigo-50 to-indigo-100',
       action: () => navigate('/reports')
+    },
+    {
+      title: 'Settings',
+      description: 'Particulars & Departments',
+      icon: Settings,
+      color: 'bg-gradient-to-br from-indigo-500 to-indigo-600',
+      gradient: 'from-indigo-50 to-indigo-100',
+      action: () => navigate('/settings')
     }
   ]
 

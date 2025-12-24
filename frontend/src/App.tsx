@@ -10,6 +10,7 @@ import OPBillEntry from './pages/OPBillEntry'
 import IPBillEntry from './pages/IPBillEntry'
 import Reports from './pages/Reports'
 import SelectPatient from './components/SelectPatient'
+import Settings from './pages/Settings'
 
 function App() {
   return (
@@ -28,6 +29,7 @@ function App() {
             <Route path="billing/op" element={<OPBillEntry />} />
             <Route path="billing/ip" element={<IPBillEntry />} />
             <Route path="reports" element={<Reports />} />
+            <Route path="settings" element={<Settings />} />
             <Route path="select-patient" element={<SelectPatient />} />
           </Route>
         </Routes>

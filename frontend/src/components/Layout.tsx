@@ -2,28 +2,25 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { 
   Home, 
-  // Users, 
   UserPlus, 
   Stethoscope, 
   FileText, 
   ClipboardList,
   LogOut,
-  // Menu,
+  Menu,
   X,
   Building,
   BarChart3,
-  // Calendar,
-  // Settings,
-  // Bell,
+  Settings,
   ChevronRight,
-  // ChevronLeft,
-  // HelpCircle,
-  // Shield,
-  // CreditCard
+  ChevronLeft,
+  User,
+  MoreVertical,
+  Bell,
+  Search
 } from 'lucide-react'
 import { useState } from 'react'
 import toast from 'react-hot-toast'
-// import { format } from 'date-fns'
 
 const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
   const { user, logout } = useAuth()
@@ -31,6 +28,7 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
   const location = useLocation()
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
 
   const menuItems = [
     { 
@@ -75,10 +73,18 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
       description: 'Analytics & reports',
       color: 'from-indigo-500 to-purple-500'
     },
+    { 
+      path: '/settings', 
+      label: 'Settings', 
+      icon: Settings,
+      description: 'Particulars & Departments',
+      color: 'from-gray-600 to-gray-800'
+    },
   ]
 
   const handleLogout = () => {
     logout()
+    setIsUserMenuOpen(false)
     toast.success('Logged out successfully')
   }
 
@@ -87,12 +93,12 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
     setIsSidebarOpen(true)
   }
 
-  // const getGreeting = () => {
-  //   const hour = new Date().getHours()
-  //   if (hour < 12) return 'Good Morning'
-  //   if (hour < 18) return 'Good Afternoon'
-  //   return 'Good Evening'
-  // }
+  const getGreeting = () => {
+    const hour = new Date().getHours()
+    if (hour < 12) return 'Good Morning'
+    if (hour < 18) return 'Good Afternoon'
+    return 'Good Evening'
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex">
@@ -129,26 +135,30 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
 
       {/* Sidebar */}
       <aside className={`
-        fixed inset-y-0 left-0 z-50 w-80 bg-gradient-to-b from-blue-900 to-indigo-900 shadow-2xl transform transition-transform duration-300 ease-in-out
+        fixed inset-y-0 left-0 z-40 w-80 bg-gradient-to-b from-blue-900 to-indigo-900 shadow-2xl transform transition-transform duration-300 ease-in-out
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} 
         lg:relative lg:translate-x-0 lg:flex-shrink-0
       `}>
         <div className="h-full flex flex-col">
           {/* Logo */}
           <div className="p-1 border-b border-blue-800">
-            <div className="flex items-center space-x-4 mb-4">
-              <div className="p-3 bg-white/10 rounded-xl backdrop-blur-sm">
-                <Building className="text-white" size={32} />
+            <div className="flex items-center justify-between p-3">
+              <div className="flex items-center space-x-4">
+                <div className="p-3 bg-white/10 rounded-xl backdrop-blur-sm">
+                  <Building className="text-white" size={32} />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-white">HMS Pro</h1>
+                  <p className="text-blue-200 text-sm">Hospital Management System</p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-2xl font-bold text-white">HMS Pro</h1>
-                <p className="text-blue-200 text-sm">Hospital Management System</p>
-              </div>
+              <button
+                onClick={() => setIsSidebarOpen(false)}
+                className="lg:hidden p-2 text-white hover:bg-white/10 rounded-lg"
+              >
+                <X size={20} />
+              </button>
             </div>
-            {/* <div className="bg-blue-800/50 rounded-lg p-3 backdrop-blur-sm">
-              <p className="text-blue-100 text-sm">License: Professional</p>
-              <p className="text-blue-200 text-xs">Version 2.0.1</p>
-            </div> */}
           </div>
 
           {/* Navigation */}
@@ -190,8 +200,8 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
             })}
           </nav>
 
-          {/* User Info & Actions */}
-          <div className="p-6 border-t border-blue-800">
+          {/* User Info */}
+          {/* <div className="p-6 border-t border-blue-800">
             <div className="flex items-center space-x-4 mb-6">
               <div className="relative">
                 <div className="w-14 h-14 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-xl flex items-center justify-center shadow-lg">
@@ -203,47 +213,18 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
               </div>
               <div className="flex-1">
                 <p className="font-semibold text-white">{user?.full_name}</p>
-                {/* <p className="text-blue-200 text-sm">Receptionist/Admin</p>
-                <p className="text-blue-300 text-xs mt-1">
-                  Last login: Today, {format(new Date(), 'hh:mm a')}
-                </p> */}
+                <p className="text-blue-200 text-sm">Administrator</p>
               </div>
             </div>
-            
-            <div className="space-y-3">
-              {/* <button className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-white/10 hover:bg-white/20 text-blue-100 rounded-xl transition-colors">
-                <Settings size={18} />
-                <span className="font-medium">Settings</span>
-              </button>
-              
-              <button className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-white/10 hover:bg-white/20 text-blue-100 rounded-xl transition-colors">
-                <HelpCircle size={18} />
-                <span className="font-medium">Help & Support</span>
-              </button> */}
-              
-              <button
-                onClick={handleLogout}
-                className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white rounded-xl transition-all shadow-md"
-              >
-                <LogOut size={18} />
-                <span className="font-semibold">Logout</span>
-              </button>
-            </div>
-            
-            <div className="mt-6 pt-6 border-t border-blue-800">
-              <p className="text-blue-300 text-xs text-center">
-                © 2025 HMS Pro. All rights reserved.
-              </p>
-            </div>
-          </div>
+          </div> */}
         </div>
       </aside>
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Bar */}
-        {/* <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-lg border-b border-gray-200">
-          <div className="px-8 py-5 flex items-center justify-between">
+        <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-lg border-b border-gray-200">
+          <div className="px-6 py-4 flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <button
                 onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -253,81 +234,116 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
               </button>
               
               <div className="hidden lg:block">
-                <h2 className="text-2xl font-bold text-gray-900">
+                <h2 className="text-xl font-bold text-gray-900">
                   {menuItems.find(item => item.path === location.pathname)?.label || 'Dashboard'}
                 </h2>
                 <p className="text-gray-600 text-sm">
-                  {getGreeting()}, {user?.full_name?.split(' ')[0]}! Welcome back.
+                  {getGreeting()}, {user?.full_name?.split(' ')[0]}!
                 </p>
               </div>
             </div>
             
-            <div className="flex items-center space-x-6">
-              {/* Quick Stats */}
-              {/* <div className="hidden xl:flex items-center space-x-6">
-                <div className="text-center px-4">
-                  <p className="text-sm text-gray-600">Today's OPs</p>
-                  <p className="text-lg font-bold text-blue-600">24</p>
-                </div>
-                <div className="text-center px-4">
-                  <p className="text-sm text-gray-600">Today's IPs</p>
-                  <p className="text-lg font-bold text-purple-600">8</p>
-                </div>
-                <div className="text-center px-4">
-                  <p className="text-sm text-gray-600">Revenue</p>
-                  <p className="text-lg font-bold text-green-600">₹45,820</p>
-                </div>
+            <div className="flex items-center space-x-4">
+              {/* Search Bar */}
+              {/* <div className="hidden md:flex items-center bg-gray-100 rounded-xl px-4 py-2 min-w-[300px]">
+                <Search size={18} className="text-gray-500 mr-2" />
+                <input
+                  type="text"
+                  placeholder="Search patients, bills, reports..."
+                  className="bg-transparent border-none outline-none w-full text-gray-700 placeholder-gray-500"
+                />
               </div> */}
-              
-              {/* Action Buttons */}
-              {/* <div className="flex items-center space-x-3">
-                <button 
-                  onClick={() => setIsNotificationsOpen(true)}
-                  className="p-3 rounded-xl bg-gradient-to-r from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200 transition-all relative"
+
+              {/* Notifications */}
+              {/* <button 
+                onClick={() => setIsNotificationsOpen(true)}
+                className="p-3 rounded-xl bg-gradient-to-r from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200 transition-all relative"
+              >
+                <Bell size={20} className="text-gray-700" />
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+                  3
+                </span>
+              </button> */}
+
+              {/* User Menu */}
+              <div className="relative">
+                <button
+                  onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                  className="flex items-center space-x-3 p-2 rounded-xl hover:bg-gray-100 transition-colors"
                 >
-                  <Bell size={20} className="text-gray-700" />
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-                    3
-                  </span>
-                </button>
-                
-                <button className="p-3 rounded-xl bg-gradient-to-r from-blue-50 to-cyan-50 hover:from-blue-100 hover:to-cyan-100 transition-all">
-                  <Shield size={20} className="text-blue-600" />
-                </button>
-                
-                <div className="hidden lg:flex items-center space-x-4 px-4 py-2 bg-gradient-to-r from-gray-50 to-gray-100 rounded-2xl">
-                  <div className="text-right">
-                    <p className="font-semibold text-gray-900">{user?.full_name}</p>
-                    <p className="text-sm text-gray-600">Admin Access</p>
-                  </div>
-                  <div className="w-12 h-12 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-xl flex items-center justify-center shadow-lg">
-                    <span className="text-lg font-bold text-white">
+                  <div className="w-10 h-10 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-xl flex items-center justify-center shadow-lg">
+                    <span className="text-sm font-bold text-white">
                       {user?.full_name?.charAt(0).toUpperCase()}
                     </span>
                   </div>
-                </div>
+                  <div className="hidden lg:block text-left">
+                    <p className="font-semibold text-gray-900 text-sm">{user?.full_name}</p>
+                    <p className="text-gray-600 text-xs">Administrator</p>
+                  </div>
+                  <MoreVertical size={20} className="text-gray-600" />
+                </button>
+
+                {/* User Dropdown Menu */}
+                {isUserMenuOpen && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-40"
+                      onClick={() => setIsUserMenuOpen(false)}
+                    />
+                    <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 overflow-hidden">
+                      <div className="p-4 border-b border-gray-100">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-12 h-12 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-xl flex items-center justify-center shadow-lg">
+                            <span className="text-lg font-bold text-white">
+                              {user?.full_name?.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                          <div>
+                            <p className="font-semibold text-gray-900">{user?.full_name}</p>
+                            <p className="text-gray-600 text-sm">Administrator</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="py-2">
+                        {/* <button
+                          onClick={() => {
+                            navigate('/profile')
+                            setIsUserMenuOpen(false)
+                          }}
+                          className="w-full flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                          <User size={18} />
+                          <span>My Profile</span>
+                        </button> */}
+                        {/* <button
+                          onClick={() => {
+                            navigate('/settings')
+                            setIsUserMenuOpen(false)
+                          }}
+                          className="w-full flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                          <Settings size={18} />
+                          <span>Settings</span>
+                        </button> */}
+                        <div className="border-t border-gray-100 my-2"></div>
+                        <button
+                          onClick={handleLogout}
+                          className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-gradient-to-r from-red-50 to-red-100 hover:from-red-100 hover:to-red-200 text-red-600 transition-all"
+                        >
+                          <LogOut size={18} />
+                          <span className="font-semibold">Logout</span>
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
-          </div> */}
-          
-          {/* Breadcrumb */}
-          {/* <div className="px-8 pb-4">
-            <div className="flex items-center text-sm text-gray-600">
-              <Home size={16} className="mr-2" />
-              <ChevronRight size={16} className="mx-2" />
-              <span className="text-gray-900 font-medium">
-                {menuItems.find(item => item.path === location.pathname)?.label || 'Dashboard'}
-              </span>
-              <ChevronRight size={16} className="mx-2" />
-              <span className="text-gray-500">
-                {format(new Date(), 'dd MMMM yyyy')}
-              </span>
-            </div>
           </div>
-        </header> */} 
+        </header>
 
         {/* Page Content */}
-        <main className="flex-1 p-8 overflow-auto">
+        <main className="flex-1 p-6 overflow-auto">
           <div className="max-w-7xl mx-auto">
             {children || <Outlet />}
           </div>
@@ -335,7 +351,7 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
 
         {/* Footer */}
         <footer className="border-t border-gray-200 bg-white/50 backdrop-blur-sm">
-          <div className="px-8 py-6">
+          <div className="px-6 py-4">
             <div className="flex flex-col md:flex-row items-center justify-between">
               <div className="flex items-center space-x-6 mb-4 md:mb-0">
                 <p className="text-sm text-gray-600">
@@ -363,6 +379,74 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
             </div>
           </div>
         </footer>
+      </div>
+
+      {/* Floating Logout Button (Mobile) */}
+      <div className="fixed bottom-6 right-6 z-40 lg:hidden">
+        <div className="relative">
+          <button
+            onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+            className="p-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full shadow-xl hover:shadow-2xl hover:scale-105 transition-all duration-200"
+            title="Quick Actions"
+          >
+            <MoreVertical size={24} />
+          </button>
+
+          {/* Mobile Quick Actions Menu */}
+          {isUserMenuOpen && (
+            <>
+              <div 
+                className="fixed inset-0 bg-black bg-opacity-30 z-40"
+                onClick={() => setIsUserMenuOpen(false)}
+              />
+              <div className="absolute bottom-16 right-0 w-56 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 overflow-hidden">
+                <div className="p-4 border-b border-gray-100">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-xl flex items-center justify-center">
+                      <span className="text-sm font-bold text-white">
+                        {user?.full_name?.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-900 text-sm">{user?.full_name}</p>
+                      <p className="text-gray-600 text-xs">Administrator</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="py-2">
+                  <button
+                    onClick={() => {
+                      navigate('/profile')
+                      setIsUserMenuOpen(false)
+                    }}
+                    className="w-full flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <User size={18} />
+                    <span>My Profile</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      navigate('/settings')
+                      setIsUserMenuOpen(false)
+                    }}
+                    className="w-full flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <Settings size={18} />
+                    <span>Settings</span>
+                  </button>
+                  <div className="border-t border-gray-100 my-2"></div>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center space-x-3 px-4 py-3 text-red-600 hover:bg-red-50 transition-colors"
+                  >
+                    <LogOut size={18} />
+                    <span className="font-semibold">Logout</span>
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   )

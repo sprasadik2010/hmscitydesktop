@@ -74,6 +74,20 @@ interface BillDetails {
   }>
 }
 
+interface Department {
+  id: number;
+  name: string;
+  created_at: string;
+}
+
+interface Particular {
+  id: number;
+  name: string;
+  department_id: number;
+  department_name?: string;
+  created_at: string;
+}
+
 // Predefined list of departments
 // const DEPARTMENTS = [
 //   'General Medicine',
@@ -89,20 +103,19 @@ interface BillDetails {
 // ]
 
 // Predefined list of particular items
-const PARTICULAR_ITEMS = [
-  'Consultation',
-  'Review',
-  'Procedure',
-  'physiotherapy',
-  'Medicine',
-  'Test',
-  'X-Ray',
-  'ECG',
-  'Ultrasound',
-  'Injection',
-  'Dressing',
-  'Other'
-]
+//   'Consultation',
+//   'Review',
+//   'Procedure',
+//   'physiotherapy',
+//   'Medicine',
+//   'Test',
+//   'X-Ray',
+//   'ECG',
+//   'Ultrasound',
+//   'Injection',
+//   'Dressing',
+//   'Other'
+// ]
 
 const OPBillEntry = () => {
   const navigate = useNavigate()
@@ -126,7 +139,10 @@ const OPBillEntry = () => {
   const [showPreviousBills, setShowPreviousBills] = useState(false)
   const [isLoadingBillDetails, setIsLoadingBillDetails] = useState(false)
 
-  // Patient Form Data
+  
+  const [particulars, setParticulars] = useState<Particular[]>([])
+  const [departments, setDepartments] = useState<Department[]>([])
+
   const [patientFormData, setPatientFormData] = useState({
     name: '',
     age: '',
@@ -173,7 +189,34 @@ const OPBillEntry = () => {
 
   useEffect(() => {
     fetchDoctors()
+    fetchDepartments()
+    fetchParticulars()
   }, [])
+
+  
+  
+    const fetchDepartments = async () => {
+      try {
+        const response = await axios.get('/settings/departments', {
+          params: { active_only: false }
+        })
+        setDepartments(response.data)
+      } catch (error) {
+        console.error('Error fetching departments:', error)
+        toast.error('Failed to load departments')
+      }
+    }
+    const fetchParticulars = async () => {
+      try {
+        const response = await axios.get('/settings/particulars', {
+          params: { active_only: false }
+        })
+        setParticulars(response.data)
+      } catch (error) {
+        console.error('Error fetching particulars:', error)
+        toast.error('Failed to load particulars')
+      }
+    }
 
   // Update consultation item when patient's doctor changes - FIXED VERSION
   useEffect(() => {
@@ -1659,8 +1702,8 @@ const addBillItem = useCallback(() => {
         // Get the main doctor from patient form or selected patient
         const mainDoctorId = selectedPatient?.doctor_id || patientFormData.doctor_id;
         const mainDoctor = doctors.find(dr => dr.id === mainDoctorId);
-        const bookingCode = mainDoctor?.booking_code || '';
-        const department = mainDoctor?.department || 'OPD';
+        const bookingCode = mainDoctor?.code || '';
+        const department = departments.find(dp => dp.id === Number(mainDoctor?.department))?.name || 'OPD';
         
         return (
           <tr key={index} className="hover:bg-gray-50">
@@ -1674,10 +1717,10 @@ const addBillItem = useCallback(() => {
                   onChange={(e) => handleBillItemChange(index, 'particular', e.target.value)}
                   className="w-full px-1 py-0.5 border border-gray-300 rounded text-xs appearance-none pr-6"
                 >
-                  <option value="">Select Particular</option>
-                  {PARTICULAR_ITEMS.map((particular, idx) => (
-                    <option key={idx} value={particular}>
-                      {particular}
+                  {/* <option value="">Select Particular</option> */}
+                  {particulars.map((particular, idx) => (
+                    <option key={idx} value={particular.id}>
+                      {particular.name}
                     </option>
                   ))}
                 </select>

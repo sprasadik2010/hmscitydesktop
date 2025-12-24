@@ -22,7 +22,8 @@ export default defineConfig(({ mode }) => {
         '/patients': { target: backendUrl, changeOrigin: true, secure: false },
         '/bills': { target: backendUrl, changeOrigin: true, secure: false },
         '/dashboard': { target: backendUrl, changeOrigin: true, secure: false },
-        '/reports': { target: backendUrl, changeOrigin: true, secure: false }
+        '/reports': { target: backendUrl, changeOrigin: true, secure: false },
+        '/settings': { target: backendUrl, changeOrigin: true, secure: false }
       }
     },
     define: {

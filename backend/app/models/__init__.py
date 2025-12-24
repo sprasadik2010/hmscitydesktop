@@ -1,4 +1,5 @@
-from .models import Base, User, Doctor, Patient, OPBill, OPBillItem, IPBill, IPBillItem
+# models/__init__.py
+from .models import Base, User, Doctor, Patient, OPBill, OPBillItem, IPBill, IPBillItem, Department, Particular
 
 __all__ = [
     "Base",
@@ -8,5 +9,7 @@ __all__ = [
     "OPBill",
     "OPBillItem",
     "IPBill",
-    "IPBillItem"
+    "IPBillItem",
+    "Department",  # Add this
+    "Particular",  # Add this
 ]

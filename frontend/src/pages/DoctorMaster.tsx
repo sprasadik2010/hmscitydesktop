@@ -3,6 +3,11 @@ import axios from 'axios'
 import { Save, Trash2, Plus, Edit, X, Search, Phone, Mail, Clock, BriefcaseMedical, Stethoscope, User } from 'lucide-react'
 import toast from 'react-hot-toast'
 
+interface Department{  
+  id?: number
+  name: string
+}
+
 interface Doctor {
   id?: number
   code: string
@@ -29,6 +34,7 @@ interface Doctor {
 
 const DoctorMaster = () => {
   const [doctors, setDoctors] = useState<Doctor[]>([])
+  const [departments, setDepartments] = useState<Department[]>([])
   const [formData, setFormData] = useState<Doctor>({
     code: '',
     name: '',
@@ -58,6 +64,7 @@ const DoctorMaster = () => {
   const [showForm, setShowForm] = useState(false)
 
   useEffect(() => {
+    fetchDepartments()
     fetchDoctors()
   }, [])
 
@@ -67,6 +74,18 @@ const DoctorMaster = () => {
         params: { active_only: false }
       })
       setDoctors(response.data)
+    } catch (error) {
+      console.error('Error fetching doctors:', error)
+      toast.error('Failed to load doctors')
+    }
+  }
+
+  const fetchDepartments = async () => {
+    try {
+      const response = await axios.get('/settings/departments', {
+        params: { active_only: false }
+      })
+      setDepartments(response.data)
     } catch (error) {
       console.error('Error fetching doctors:', error)
       toast.error('Failed to load doctors')
@@ -297,7 +316,7 @@ const DoctorMaster = () => {
                     value={formData.code}
                     onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                     className="input-field border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                    placeholder="DR001"
+                    placeholder="JS"
                     required
                   />
                 </div>
@@ -363,15 +382,11 @@ const DoctorMaster = () => {
                     required
                   >
                     <option value="">Select Department</option>
-                    <option value="General Medicine">General Medicine</option>
-                    <option value="Cardiology">Cardiology</option>
-                    <option value="Pediatrics">Pediatrics</option>
-                    <option value="Orthopedics">Orthopedics</option>
-                    <option value="Dermatology">Dermatology</option>
-                    <option value="Neurology">Neurology</option>
-                    <option value="ENT">ENT</option>
-                    <option value="Ophthalmology">Ophthalmology</option>
-                    <option value="Dentistry">Dentistry</option>
+                    {departments.map((dept) => (
+                      <option key={dept.id} value={dept.id}>
+                        {dept.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -480,7 +495,7 @@ const DoctorMaster = () => {
                   />
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2 hidden">
                   <label className="block text-sm font-medium text-gray-900">
                     Booking Code
                   </label>

@@ -130,4 +130,51 @@ export const reportAPI = {
     api.get<any>(`/reports/doctor-performance?date_from=${dateFrom || ''}&date_to=${dateTo || ''}`),
 };
 
+// Add to your existing api.ts
+// Settings API
+export const settingsAPI = {
+  // Departments
+  getDepartments: (params?: { 
+    is_active?: boolean; 
+    search?: string 
+  }) => api.get<any[]>('/settings/departments', { params }),
+  
+  createDepartment: (data: any) => 
+    api.post('/settings/departments', data),
+  
+  updateDepartment: (departmentId: number, data: any) => 
+    api.put(`/settings/departments/${departmentId}`, data),
+  
+  deleteDepartment: (departmentId: number) => 
+    api.delete(`/settings/departments/${departmentId}`),
+  
+  updateDepartmentStatus: (departmentId: number, isActive: boolean) => 
+    api.patch(`/settings/departments/${departmentId}/status`, { is_active: isActive }),
+
+  // Particulars
+  getParticulars: (params?: { 
+    department_id?: number;
+    is_active?: boolean;
+    search?: string;
+    min_amount?: number;
+    max_amount?: number;
+  }) => api.get<any[]>('/settings/particulars', { params }),
+  
+  createParticular: (data: any) => 
+    api.post('/settings/particulars', data),
+  
+  updateParticular: (particularId: number, data: any) => 
+    api.put(`/settings/particulars/${particularId}`, data),
+  
+  deleteParticular: (particularId: number) => 
+    api.delete(`/settings/particulars/${particularId}`),
+  
+  updateParticularStatus: (particularId: number, isActive: boolean) => 
+    api.patch(`/settings/particulars/${particularId}/status`, { is_active: isActive }),
+
+  // Stats
+  getSettingsStats: () => 
+    api.get('/settings/stats'),
+};
+
 export default api;

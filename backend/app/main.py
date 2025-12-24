@@ -5,7 +5,7 @@ from datetime import datetime
 import os
 
 from database import create_tables
-from .routers import auth, patients, doctors, bills, dashboard, reports, seeder
+from .routers import auth, patients, doctors, bills, dashboard, reports, seeder, settings
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -53,7 +53,8 @@ app.include_router(doctors.router)
 app.include_router(bills.router)
 app.include_router(dashboard.router)
 app.include_router(reports.router)
-app.include_router(seeder.router) 
+app.include_router(seeder.router)
+app.include_router(settings.router)
 
 @app.get("/")
 async def root():

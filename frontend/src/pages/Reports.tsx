@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import axios from 'axios'
 import { Download, Filter, Calendar, Printer, FileText, BarChart3, Users, CreditCard, TrendingUp, Building, ArrowUpRight, TestTube } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { format } from 'date-fns'
+import { format, isValid, parseISO } from 'date-fns'
 
 const Reports = () => {
   const [activeReport, setActiveReport] = useState('daily-op')
@@ -53,6 +53,18 @@ const Reports = () => {
     }
   ]
 
+  // Safe date formatting function
+  const formatSafeDate = (dateString: string | null | undefined, formatStr: string) => {
+    if (!dateString) return 'N/A';
+    try {
+      const date = parseISO(dateString);
+      if (!isValid(date)) return 'N/A';
+      return format(date, formatStr);
+    } catch {
+      return 'N/A';
+    }
+  };
+
   const fetchParticularsList = async (search: string = '') => {
     setIsLoadingParticulars(true)
     try {
@@ -60,18 +72,17 @@ const Reports = () => {
         params: { search, limit: 20 }
       })
       setParticularsList(response.data.particulars)
-      console.log(particularsList.length)
     } catch (error) {
       console.error('Failed to fetch particulars list')
       setParticularsList([])
     } finally {
       setIsLoadingParticulars(false)
-      console.log(isLoadingParticulars)
     }
   }
 
   const fetchReport = async () => {
     setIsLoading(true)
+    setReportData(null) // Clear previous data before fetching new
     try {
       let response
 
@@ -128,11 +139,6 @@ const Reports = () => {
     fetchParticularsList()
   }, [])
 
-  //  const handlePrint = () => {
-  //   window.print();   
-  //   };
-
-
   const getTotalRevenue = () => {
     if (!reportData) return 0
 
@@ -154,7 +160,6 @@ const Reports = () => {
     let totalRevenue = getTotalRevenue().toFixed(2)
     switch (activeReport) {
       case 'daily-op':
-        console.log(reportData)
         title = 'OP Report'
         break
 
@@ -173,8 +178,9 @@ const Reports = () => {
       default:
         title = ''
     }
+    
     // Create complete HTML document for printing
-  let printHTML = `
+    let printHTML = `
 <!DOCTYPE html>
 <html>
   <head>
@@ -253,7 +259,6 @@ const Reports = () => {
         grid-template-columns: repeat(2, 1fr);
         gap: 20px;
         margin-bottom: 30px;
-        // justify-items: center;
       }
       
       .revenue-report-stats {
@@ -261,7 +266,6 @@ const Reports = () => {
         grid-template-columns: repeat(3, 1fr);
         gap: 20px;
         margin-bottom: 30px;
-        // justify-items: center;
       }
       
       .stat-card {
@@ -413,7 +417,7 @@ const Reports = () => {
         
       .filter-grid {
         display: flex;
-        justify-content: space-between; /* ← key line */
+        justify-content: space-between;
         align-items: center;
         width: 100%;
       }
@@ -432,6 +436,93 @@ const Reports = () => {
       
       .filter-value {
         font-weight: 500;
+      }
+
+      .space-y-6 > * + * {
+        margin-top: 24px;
+      }
+
+      .flex {
+        display: flex;
+      }
+
+      .items-center {
+        align-items: center;
+      }
+
+      .justify-between {
+        justify-content: space-between;
+      }
+
+      .mt-2 {
+        margin-top: 8px;
+      }
+
+      .ml-2 {
+        margin-left: 8px;
+      }
+
+      .space-x-4 > * + * {
+        margin-left: 16px;
+      }
+
+      .text-sm {
+        font-size: 14px;
+      }
+
+      .text-gray-600 {
+        color: #6b7280;
+      }
+
+      .font-semibold {
+        font-weight: 600;
+      }
+
+      .text-blue-700 {
+        color: #1d4ed8;
+      }
+
+      .text-purple-700 {
+        color: #7c3aed;
+      }
+
+      .p-4 {
+        padding: 16px;
+      }
+
+      .bg-purple-100 {
+        background-color: #f3e8ff;
+        border-color: #e9d5ff;
+      }
+
+      .rounded-xl {
+        border-radius: 12px;
+      }
+
+      .overflow-x-auto {
+        overflow-x: auto;
+      }
+
+      .border-gray-200 {
+        border-color: #e5e7eb;
+      }
+
+      .font-medium {
+        font-weight: 500;
+      }
+
+      .max-w-xs {
+        max-width: 320px;
+      }
+
+      .truncate {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .bg-gray-50 {
+        background-color: #f9fafb;
       }
     </style>
   </head>
@@ -464,11 +555,10 @@ const Reports = () => {
             <span class="filter-value">${title}</span>
           </div>          
         </div>
-      </div>
-      `;
-      if(activeReport === 'daily-op')
-          {      
-            printHTML += `
+      </div>`;
+
+    if (activeReport === 'daily-op' && Array.isArray(reportData)) {
+      printHTML += `
             <!-- OP Summary Statistics -->
                 <div class="section-title">Summary Overview</div>
                 <div class="op-summary-stats">
@@ -480,11 +570,38 @@ const Reports = () => {
                     <div class="stat-label">Total Revenue</div>
                     <div class="stat-value">₹${totalRevenue}</div>
                   </div>
-                </div>`
-              }
-        else if(activeReport === 'bill-summary')
-          {      
-            printHTML += `
+                </div>
+                <div class="overflow-x-auto rounded-xl border border-gray-200">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>Bill No</th>
+                        <th>Patient</th>
+                        <th>Doctor</th>
+                        <th>Bill Type</th>
+                        <th>Total</th>
+                        <th>Discount</th>
+                        <th>Net Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${reportData.map((bill: any) => `
+                        <tr>
+                          <td><div class="font-medium">${bill.bill_number || 'N/A'}</div></td>
+                          <td><div class="font-medium">${bill.patient?.name || 'N/A'}</div></td>
+                          <td><div class="font-medium">${bill.doctor?.name || 'N/A'}</div></td>
+                          <td><span class="bill-type ${bill.bill_type === 'Cash' ? 'cash' : 'insurance'}">${bill.bill_type || 'N/A'}</span></td>
+                          <td>₹${bill.total_amount?.toFixed(2) || '0.00'}</td>
+                          <td>₹${bill.discount_amount?.toFixed(2) || '0.00'}</td>
+                          <td>₹${bill.net_amount?.toFixed(2) || '0.00'}</td>
+                        </tr>
+                      `).join('')}
+                    </tbody>
+                  </table>
+                </div>`;
+    }
+    else if (activeReport === 'bill-summary') {
+      printHTML += `
             <!-- OP Summary Statistics -->
                 <div class="section-title">Summary Overview</div>
                 <div class="revenue-report-stats">
@@ -500,36 +617,120 @@ const Reports = () => {
                     <div class="stat-label">Total Revenue</div>
                     <div class="stat-value">₹${reportData?.total_amount?.toFixed(2) || '0.00'}</div>
                   </div>
-                </div>`
-              }
-        else if(activeReport === 'patient-list')
-          {      
-            printHTML += `
-            <!-- OP Summary Statistics -->
-                <div class="section-title">Summary Overview</div>
-                <div class="revenue-report-stats">
-                  <div class="stat-card blue">
-                    <div class="stat-label">Total OP Revenue</div>
-                    <div class="stat-value">₹${reportData?.total_op_amount?.toFixed(2) || '0.00'}</div>
-                  </div>
-                  <div class="stat-card purple">
-                    <div class="stat-label">Total IP Revenue</div>
-                    <div class="stat-value">₹${reportData?.total_ip_amount?.toFixed(2) || '0.00'}</div>
-                  </div>
-                  <div class="stat-card green">
-                    <div class="stat-label">Total Revenue</div>
-                    <div class="stat-value">₹${reportData?.total_amount?.toFixed(2) || '0.00'}</div>
-                  </div>
-                </div>`
-              }
-        printHTML == `<div class="generated-info">
+                </div>`;
+    }
+    else if (activeReport === 'patient-list' && Array.isArray(reportData)) {
+      // Process patient list data - check if it's bill data or patient data
+      const patientsList = reportData[0]?.patient 
+        ? reportData.map((bill: any) => ({
+            ...bill.patient,
+            type: bill.patient?.is_ip ? 'INPATIENT' : 'OUTPATIENT',
+            registration_date: bill.patient?.registration_date,
+            address: [bill.patient?.house, bill.patient?.street, bill.patient?.place].filter(Boolean).join(', ')
+          }))
+        : reportData.map((patient: any) => ({
+            ...patient,
+            type: patient.is_ip ? 'INPATIENT' : 'OUTPATIENT',
+            registration_date: patient.registration_date,
+            address: [patient.house, patient.street, patient.place].filter(Boolean).join(', ')
+          }));
+      
+      const opPatients = patientsList.filter((p: any) => !p.is_ip).length;
+      const ipPatients = patientsList.filter((p: any) => p.is_ip).length;
+      
+      printHTML += `
+    <div class="space-y-6">
+      <!-- Summary Card -->
+      <div class="stat-card purple">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="stat-label">Total Patients</p>
+            <p class="stat-value">${patientsList.length || 0}</p>
+            <div class="flex space-x-4 mt-2">
+              <div>
+                <span class="text-sm text-gray-600">OP Patients:</span>
+                <span class="ml-2 font-semibold text-blue-700">${opPatients}</span>
+              </div>
+              <div>
+                <span class="text-sm text-gray-600">IP Patients:</span>
+                <span class="ml-2 font-semibold text-purple-700">${ipPatients}</span>
+              </div>
+            </div>
+          </div>
+          <div class="p-4 bg-purple-100 rounded-xl">
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-users text-purple-600" aria-hidden="true">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+              <path d="M16 3.128a4 4 0 0 1 0 7.744"></path>
+              <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+              <circle cx="9" cy="7" r="4"></circle>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Patients Table -->
+      <div class="overflow-x-auto rounded-xl border border-gray-200">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Patient ID</th>
+              <th>Name</th>
+              <th>Age/Gender</th>
+              <th>Contact</th>
+              <th>Address</th>
+              <th>Registered On</th>
+              <th>Type</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${patientsList.map((patient: any) => `
+              <tr class="${patient.is_ip ? 'bg-gray-50' : ''}">
+                <td><div class="font-medium">${patient.is_ip ? (patient.ip_number || patient.id) : (patient.op_number || patient.id)}</div></td>
+                <td><div class="font-medium">${patient.name || 'N/A'}</div></td>
+                <td>
+                  <div>${patient.age || 'N/A'}</div>
+                  <div class="text-sm text-gray-600">${patient.gender || 'N/A'}</div>
+                </td>
+                <td><div>${patient.phone || 'N/A'}</div></td>
+                <td><div class="max-w-xs truncate">${patient.address || 'N/A'}</div></td>
+                <td>
+                  <div>${patient.registration_date ? new Date(patient.registration_date).toLocaleDateString('en-IN') : 'N/A'}</div>
+                  <div class="text-sm text-gray-600">${patient.registration_date ? new Date(patient.registration_date).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : 'N/A'}</div>
+                </td>
+                <td>
+                  <span class="bill-type ${patient.is_ip ? 'insurance' : 'cash'}">
+                    ${patient.is_ip ? 'INPATIENT' : 'OUTPATIENT'}
+                  </span>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+    }
+    else if (activeReport === 'particulars-report') {
+      printHTML += `
+      <div class="section-title">Particulars Report - ${particularName}</div>
+      <div class="op-summary-stats">
+        <div class="stat-card blue">
+          <div class="stat-label">Total Count</div>
+          <div class="stat-value">${reportData?.total_count || 0}</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-label">Total Revenue</div>
+          <div class="stat-value">₹${reportData?.total_amount?.toFixed(2) || '0.00'}</div>
+        </div>
+      </div>`;
+    }
+    
+    printHTML += `<div class="generated-info">
           Report generated on ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })} at ${new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
         </div>
       </div>
     </div>
   </body>
-</html>
-`
+</html>`;
 
     // Create a hidden iframe for printing
     const iframe = document.createElement('iframe');
@@ -567,7 +768,6 @@ const Reports = () => {
     }
   };
 
-
   const handleExport = () => {
     if (!reportData) return
 
@@ -585,12 +785,18 @@ const Reports = () => {
   const getRecordCount = () => {
     if (!reportData) return 0
 
-    if (Array.isArray(reportData)) {
-      return reportData.length
-    } else if (reportData.op_bills || reportData.ip_bills) {
+    if (activeReport === 'patient-list') {
+      if (Array.isArray(reportData)) {
+        return reportData.length;
+      }
+    } else if (activeReport === 'daily-op') {
+      if (Array.isArray(reportData)) {
+        return reportData.length;
+      }
+    } else if (activeReport === 'bill-summary') {
       return (reportData.op_bills?.length || 0) + (reportData.ip_bills?.length || 0)
-    } else if (reportData.total_count !== undefined) {
-      return reportData.total_count
+    } else if (activeReport === 'particulars-report') {
+      return reportData.total_count || 0
     }
     return 0
   }
@@ -690,7 +896,7 @@ const Reports = () => {
                   {reportData.summary_by_date.map((item: any, index: number) => (
                     <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                       <td className="px-4 py-3 whitespace-nowrap font-medium text-gray-900">
-                        {item.date ? format(new Date(item.date), 'dd/MM/yyyy') : 'N/A'}
+                        {item.date ? formatSafeDate(item.date, 'dd/MM/yyyy') : 'N/A'}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
@@ -745,7 +951,7 @@ const Reports = () => {
                     <div className="text-sm text-gray-600">{item.patient_age} • {item.patient_gender}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    {item.bill_date ? format(new Date(item.bill_date), 'dd/MM/yyyy') : 'N/A'}
+                    {formatSafeDate(item.bill_date, 'dd/MM/yyyy')}
                   </td>
                   <td className="px-6 py-4">
                     <div className="font-medium text-gray-900">{item.particular}</div>
@@ -768,7 +974,7 @@ const Reports = () => {
                     <div className="text-sm text-gray-600">{item.patient_age} • {item.patient_gender}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    {item.bill_date ? format(new Date(item.bill_date), 'dd/MM/yyyy') : 'N/A'}
+                    {formatSafeDate(item.bill_date, 'dd/MM/yyyy')}
                   </td>
                   <td className="px-6 py-4">
                     <div className="font-medium text-gray-900">{item.particular}</div>
@@ -843,6 +1049,19 @@ const Reports = () => {
 
     switch (activeReport) {
       case 'daily-op':
+        // Check if reportData is in the correct format for daily-op
+        if (!Array.isArray(reportData) || (reportData.length > 0 && !reportData[0]?.bill_number)) {
+          return (
+            <div className="text-center py-16 bg-gradient-to-b from-gray-50 to-white rounded-xl">
+              <FileText className="w-20 h-20 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-700 mb-2">Invalid Data Format</h3>
+              <p className="text-gray-500 max-w-md mx-auto">
+                Daily OP report data is not in the expected format. Please try refreshing.
+              </p>
+            </div>
+          );
+        }
+
         return (
           <div className="space-y-6">
             {/* Summary Cards */}
@@ -941,7 +1160,7 @@ const Reports = () => {
                     <tr key={bill.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="font-medium text-gray-900">{bill.bill_number}</div>
-                        <div className="text-sm text-gray-600">{format(new Date(bill.bill_date), 'HH:mm')}</div>
+                        <div className="text-sm text-gray-600">{formatSafeDate(bill.bill_date, 'HH:mm')}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="font-medium text-gray-900">{bill.patient?.name || 'N/A'}</div>
@@ -1064,8 +1283,8 @@ const Reports = () => {
                         <div className="text-sm text-gray-600">{bill.patient?.phone || ''}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-gray-900">{format(new Date(bill.bill_date), 'dd/MM/yyyy')}</div>
-                        <div className="text-sm text-gray-600">{format(new Date(bill.bill_date), 'HH:mm')}</div>
+                        <div className="text-gray-900">{formatSafeDate(bill.bill_date, 'dd/MM/yyyy')}</div>
+                        <div className="text-sm text-gray-600">{formatSafeDate(bill.bill_date, 'HH:mm')}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="font-bold text-green-700">₹{bill.net_amount?.toFixed(2)}</div>
@@ -1079,6 +1298,30 @@ const Reports = () => {
         )
 
       case 'patient-list':
+        // Check if reportData has the correct structure for patient list
+        if (!Array.isArray(reportData)) {
+          return (
+            <div className="text-center py-16 bg-gradient-to-b from-gray-50 to-white rounded-xl">
+              <Users className="w-20 h-20 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-700 mb-2">Invalid Data Format</h3>
+              <p className="text-gray-500 max-w-md mx-auto">
+                Patient list data is not in the expected format. Please try refreshing.
+              </p>
+            </div>
+          );
+        }
+
+        // Process the data based on its structure
+        const patientsList = reportData[0]?.patient 
+          ? reportData.map((bill: any) => ({
+              ...bill.patient,
+              doctor_name: bill.doctor?.name,
+              bill_date: bill.bill_date,
+              bill_number: bill.bill_number,
+              bill_type: bill.bill_type
+            }))
+          : reportData;
+
         return (
           <div className="space-y-6">
             {/* Summary Card */}
@@ -1086,18 +1329,18 @@ const Reports = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">Total Patients</p>
-                  <p className="text-3xl font-bold text-gray-900">{getRecordCount()}</p>
+                  <p className="text-3xl font-bold text-gray-900">{patientsList.length}</p>
                   <div className="flex space-x-4 mt-2">
                     <div>
                       <span className="text-sm text-gray-600">OP Patients:</span>
                       <span className="ml-2 font-semibold text-blue-700">
-                        {Array.isArray(reportData) ? reportData.filter((p: any) => !p.is_ip).length : 0}
+                        {patientsList.filter((p: any) => !p.is_ip).length}
                       </span>
                     </div>
                     <div>
                       <span className="text-sm text-gray-600">IP Patients:</span>
                       <span className="ml-2 font-semibold text-purple-700">
-                        {Array.isArray(reportData) ? reportData.filter((p: any) => p.is_ip).length : 0}
+                        {patientsList.filter((p: any) => p.is_ip).length}
                       </span>
                     </div>
                   </div>
@@ -1137,7 +1380,7 @@ const Reports = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {Array.isArray(reportData) && reportData.map((patient: any, index: number) => (
+                  {patientsList.map((patient: any, index: number) => (
                     <tr key={patient.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="font-medium text-gray-900">
@@ -1153,9 +1396,6 @@ const Reports = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-gray-900">{patient.phone}</div>
-                        {patient.email && (
-                          <div className="text-sm text-gray-600">{patient.email}</div>
-                        )}
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-gray-900 max-w-xs truncate">
@@ -1163,8 +1403,8 @@ const Reports = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-gray-900">{format(new Date(patient.registration_date), 'dd/MM/yyyy')}</div>
-                        <div className="text-sm text-gray-600">{format(new Date(patient.registration_date), 'HH:mm')}</div>
+                        <div className="text-gray-900">{formatSafeDate(patient.registration_date, 'dd/MM/yyyy')}</div>
+                        <div className="text-sm text-gray-600">{formatSafeDate(patient.registration_date, 'HH:mm')}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-3 py-1 text-xs font-medium rounded-full ${patient.is_ip
@@ -1252,154 +1492,156 @@ const Reports = () => {
 
         <div className="p-6 space-y-8">
           {/* Filters Section */}
-          <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-2xl p-6 border border-gray-200">
-            <div className="flex items-center mb-6">
-              <div className="p-3 bg-blue-100 rounded-lg mr-4">
-                <Filter className="text-blue-600" size={24} />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-gray-900">Filter Report Data</h3>
-                <p className="text-gray-600">Customize date range and parameters</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-900">
-                  Start Date *
-                </label>
-                <div className="relative">
-                  <Calendar className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-                  <input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
+          {activeReport !== 'daily-op' && (
+            <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-2xl p-6 border border-gray-200">
+              <div className="flex items-center mb-6">
+                <div className="p-3 bg-blue-100 rounded-lg mr-4">
+                  <Filter className="text-blue-600" size={24} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">Filter Report Data</h3>
+                  <p className="text-gray-600">Customize date range and parameters</p>
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-900">
-                  End Date *
-                </label>
-                <div className="relative">
-                  <Calendar className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-                  <input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Particulars Report Filters */}
-            {activeReport === 'particulars-report' && (
-              <div className="mt-6 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-gray-900">
-                    Particular Name *
+                    Start Date *
                   </label>
                   <div className="relative">
-                    <select
-                      value={particularName}
-                      onChange={(e) => setParticularName(e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent appearance-none bg-white"
-                    >
-                      <option value="">Select a particular...</option>
-                      {Array.from(new Set([
-                        'Room Charges',
-                        'Doctor Fees',
-                        'Water Bill',
-                        'Professional Fee',
-                        'Consultation',
-                        'Review',
-                        'Procedure',
-                        'physiotherapy',
-                        'Medicine',
-                        'Test',
-                        'X-Ray',
-                        'ECG',
-                        'Ultrasound',
-                        'Injection',
-                        'Dressing',
-                        'Other'
-                      ]))
-                        .sort((a, b) => a.localeCompare(b))
-                        .map((item, index) => (
-                          <option key={index} value={item}>
-                            {item}
-                          </option>
-                        ))}
-                    </select>
-                    <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
-                      <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </div>
+                    <Calendar className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
                   </div>
-                  <p className="text-xs text-gray-500">
-                    Select from: X-RAY, ECG, BLOOD TEST, USG, CT SCAN, MRI, etc.
-                  </p>
                 </div>
 
-                {/* Checkboxes - unchanged */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <label className="flex items-center space-x-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                    <input
-                      type="checkbox"
-                      checked={includeOp}
-                      onChange={(e) => setIncludeOp(e.target.checked)}
-                      className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                    />
-                    <span className="text-sm font-medium text-gray-900">Include OP Bills</span>
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-900">
+                    End Date *
                   </label>
-
-                  <label className="flex items-center space-x-3 p-3 bg-purple-50 rounded-lg border border-purple-200">
+                  <div className="relative">
+                    <Calendar className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
                     <input
-                      type="checkbox"
-                      checked={includeIp}
-                      onChange={(e) => setIncludeIp(e.target.checked)}
-                      className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
-                    <span className="text-sm font-medium text-gray-900">Include IP Bills</span>
-                  </label>
-
-                  <label className="flex items-center space-x-3 p-3 bg-teal-50 rounded-lg border border-teal-200">
-                    <input
-                      type="checkbox"
-                      checked={groupByPatient}
-                      onChange={(e) => setGroupByPatient(e.target.checked)}
-                      className="w-4 h-4 text-teal-600 rounded focus:ring-teal-500"
-                    />
-                    <span className="text-sm font-medium text-gray-900">Group by Patient</span>
-                  </label>
+                  </div>
                 </div>
               </div>
-            )}
 
-            <div className="flex justify-end space-x-3 mt-6">
-              <button
-                onClick={fetchReport}
-                disabled={isLoading}
-                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white font-medium rounded-xl hover:from-blue-700 hover:to-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md flex items-center"
-              >
-                {isLoading ? (
-                  <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                    Loading...
-                  </>
-                ) : (
-                  <>
-                    <Filter size={20} className="mr-2" />
-                    Apply Filters
-                  </>
-                )}
-              </button>
+              {/* Particulars Report Filters */}
+              {activeReport === 'particulars-report' && (
+                <div className="mt-6 space-y-4">
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-900">
+                      Particular Name *
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={particularName}
+                        onChange={(e) => setParticularName(e.target.value)}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent appearance-none bg-white"
+                      >
+                        <option value="">Select a particular...</option>
+                        {Array.from(new Set([
+                          'Room Charges',
+                          'Doctor Fees',
+                          'Water Bill',
+                          'Professional Fee',
+                          'Consultation',
+                          'Review',
+                          'Procedure',
+                          'physiotherapy',
+                          'Medicine',
+                          'Test',
+                          'X-Ray',
+                          'ECG',
+                          'Ultrasound',
+                          'Injection',
+                          'Dressing',
+                          'Other'
+                        ]))
+                          .sort((a, b) => a.localeCompare(b))
+                          .map((item, index) => (
+                            <option key={index} value={item}>
+                              {item}
+                            </option>
+                          ))}
+                      </select>
+                      <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                        <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      Select from: X-RAY, ECG, BLOOD TEST, USG, CT SCAN, MRI, etc.
+                    </p>
+                  </div>
+
+                  {/* Checkboxes */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <label className="flex items-center space-x-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                      <input
+                        type="checkbox"
+                        checked={includeOp}
+                        onChange={(e) => setIncludeOp(e.target.checked)}
+                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                      />
+                      <span className="text-sm font-medium text-gray-900">Include OP Bills</span>
+                    </label>
+
+                    <label className="flex items-center space-x-3 p-3 bg-purple-50 rounded-lg border border-purple-200">
+                      <input
+                        type="checkbox"
+                        checked={includeIp}
+                        onChange={(e) => setIncludeIp(e.target.checked)}
+                        className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+                      />
+                      <span className="text-sm font-medium text-gray-900">Include IP Bills</span>
+                    </label>
+
+                    <label className="flex items-center space-x-3 p-3 bg-teal-50 rounded-lg border border-teal-200">
+                      <input
+                        type="checkbox"
+                        checked={groupByPatient}
+                        onChange={(e) => setGroupByPatient(e.target.checked)}
+                        className="w-4 h-4 text-teal-600 rounded focus:ring-teal-500"
+                      />
+                      <span className="text-sm font-medium text-gray-900">Group by Patient</span>
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end space-x-3 mt-6">
+                <button
+                  onClick={fetchReport}
+                  disabled={isLoading}
+                  className="px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white font-medium rounded-xl hover:from-blue-700 hover:to-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md flex items-center"
+                >
+                  {isLoading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                      Loading...
+                    </>
+                  ) : (
+                    <>
+                      <Filter size={20} className="mr-2" />
+                      Apply Filters
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Report Header */}
           <div className="flex flex-col sm:flex-row items-center justify-between space-y-4 sm:space-y-0">
@@ -1407,9 +1649,16 @@ const Reports = () => {
               <h3 className="text-xl font-bold text-gray-900">
                 {reportTypes.find(r => r.id === activeReport)?.label}
               </h3>
-              <p className="text-gray-600">
-                Generated for period: {format(new Date(startDate), 'dd MMM yyyy')} - {format(new Date(endDate), 'dd MMM yyyy')}
-              </p>
+              {activeReport === 'daily-op' && (
+                <p className="text-gray-600">
+                  Generated for the day: {format(new Date(), 'dd MMM yyyy')}
+                </p>                  
+              )}
+              {activeReport !== 'daily-op' && (
+                <p className="text-gray-600">
+                  Generated for period: {format(new Date(startDate), 'dd MMM yyyy')} - {format(new Date(endDate), 'dd MMM yyyy')}
+                </p>                  
+              )}
             </div>
 
             <div className="flex flex-wrap gap-3">
