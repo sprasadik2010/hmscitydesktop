@@ -167,7 +167,7 @@ const IPBillEntry = () => {
     she_education_cess: 0
   })
 
-  const [billPurticularsnDepts] = useState<BillPurtcularsnDept[]>([
+  const [billParticularsnDepts] = useState<BillPurtcularsnDept[]>([
     { particular: 'Room Charges', department: 'General' },
     { particular: 'Doctor Fees', department: 'General' },
     { particular: 'Water Bill', department: 'General' },
@@ -185,7 +185,7 @@ const IPBillEntry = () => {
 
     // Initialize bill items
     const doctorId = patientFormData.doctor_id
-    const initialBillItems = billPurticularsnDepts.map((PnD) => ({
+    const initialBillItems = billParticularsnDepts.map((PnD) => ({
       particular: PnD.particular,
       department: PnD.department,
       doctor_id: doctorId,
@@ -195,7 +195,7 @@ const IPBillEntry = () => {
       total: 0
     }));
     setBillItems(initialBillItems);
-  }, [billPurticularsnDepts]);
+  }, [billParticularsnDepts]);
 
   useEffect(() => {
     fetchDoctors()
@@ -393,9 +393,9 @@ const IPBillEntry = () => {
       }))
       setBillItems(mappedItems)
     } else {
-      // If no items, use default items from billPurticularsnDepts
+      // If no items, use default items from billParticularsnDepts
       const doctorId = selectedPatient?.doctor_id || patientFormData.doctor_id
-      const defaultItems = billPurticularsnDepts.map(PnD => ({
+      const defaultItems = billParticularsnDepts.map(PnD => ({
         particular: PnD.particular,
         department: PnD.department,
         doctor_id: doctorId,
@@ -437,9 +437,9 @@ const IPBillEntry = () => {
       she_education_cess: 0
     })
 
-    // Reset bill items using billPurticularsnDepts with current patient's doctor
+    // Reset bill items using billParticularsnDepts with current patient's doctor
     const doctorId = selectedPatient?.doctor_id || patientFormData.doctor_id
-    const defaultItems = billPurticularsnDepts.map(PnD => ({
+    const defaultItems = billParticularsnDepts.map(PnD => ({
       particular: PnD.particular,
       department: PnD.department,
       doctor_id: doctorId,
@@ -486,7 +486,7 @@ const IPBillEntry = () => {
   }
 
   const removeBillItem = (index: number) => {
-    if (billItems.length > billPurticularsnDepts.length) {
+    if (billItems.length > billParticularsnDepts.length) {
       const newItems = billItems.filter((_, i) => i !== index)
       setBillItems(newItems)
     } else {
@@ -983,9 +983,9 @@ const IPBillEntry = () => {
       she_education_cess: 0
     })
 
-    // Reset bill items using billPurticularsnDepts
+    // Reset bill items using billParticularsnDepts
     const doctorId = doctors[0]?.id || 0
-    const defaultItems = billPurticularsnDepts.map(PnD => ({
+    const defaultItems = billParticularsnDepts.map(PnD => ({
       particular: PnD.particular,
       department: PnD.department,
       doctor_id: doctorId,
@@ -1639,7 +1639,7 @@ const IPBillEntry = () => {
                         ₹{item.total.toFixed(2)}
                       </td>
                       <td className="px-2 py-1.5 border text-center">
-                        {billItems.length > billPurticularsnDepts.length && (
+                        {billItems.length > billParticularsnDepts.length && (
                           <button
                             onClick={() => removeBillItem(index)}
                             className="text-red-500 hover:text-red-700 text-sm"

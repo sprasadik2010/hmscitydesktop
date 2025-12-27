@@ -161,3 +161,17 @@ class IPBillItem(Base):
     
     # Relationships
     bill = relationship("IPBill", back_populates="items")
+
+class Department(Base):
+    __tablename__ = "departments"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class Particular(Base):
+    __tablename__ = "particulars"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(200), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)

@@ -15,9 +15,7 @@ import {
   ChevronRight,
   ChevronLeft,
   User,
-  MoreVertical,
-  Bell,
-  Search
+  MoreVertical
 } from 'lucide-react'
 import { useState } from 'react'
 import toast from 'react-hot-toast'

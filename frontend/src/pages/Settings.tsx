@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Plus, Trash2, Building, Tag, X, Save, RefreshCw } from 'lucide-react';
+import { Settings, Plus, Trash2, Building, Tag, X, RefreshCw } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
@@ -14,8 +14,6 @@ interface Department {
 interface Particular {
   id: number;
   name: string;
-  department_id: number;
-  department_name?: string;
   created_at: string;
 }
 
@@ -30,7 +28,7 @@ const SettingsPage: React.FC = () => {
   const [showDeptForm, setShowDeptForm] = useState(false);
   
   const [newParticularName, setNewParticularName] = useState('');
-  const [selectedDeptId, setSelectedDeptId] = useState<number>(0);
+  // REMOVED: const [selectedDeptId, setSelectedDeptId] = useState<number>(0);
   const [showParticularForm, setShowParticularForm] = useState(false);
   
   const [stats, setStats] = useState({
@@ -105,20 +103,21 @@ const SettingsPage: React.FC = () => {
       return;
     }
 
-    if (selectedDeptId === 0) {
-      toast.error('Please select a department');
-      return;
-    }
+    // REMOVED: Department selection validation
+    // if (selectedDeptId === 0) {
+    //   toast.error('Please select a department');
+    //   return;
+    // }
 
     try {
       const response = await axios.post(`${API_BASE_URL}/settings/particulars`, {
-        name: newParticularName,
-        department_id: selectedDeptId
+        name: newParticularName
+        // REMOVED: department_id: selectedDeptId
       });
       
       setParticulars([...particulars, response.data]);
       setNewParticularName('');
-      setSelectedDeptId(0);
+      // REMOVED: setSelectedDeptId(0);
       setShowParticularForm(false);
       
       toast.success('Particular added');
@@ -290,7 +289,8 @@ const SettingsPage: React.FC = () => {
                     <div>
                       <div className="font-medium text-gray-900">{part.name}</div>
                       <div className="text-sm text-gray-500">
-                        Department: {part.department_name}
+                        {/* REMOVED: Department display */}
+                        Created: {new Date(part.created_at).toLocaleDateString()}
                       </div>
                     </div>
                     <button
@@ -371,19 +371,7 @@ const SettingsPage: React.FC = () => {
                     placeholder="Enter particular name"
                   />
                 </div>
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Department</label>
-                  <select
-                    value={selectedDeptId}
-                    onChange={(e) => setSelectedDeptId(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  >
-                    <option value={0}>Select Department</option>
-                    {departments.map(dept => (
-                      <option key={dept.id} value={dept.id}>{dept.name}</option>
-                    ))}
-                  </select>
-                </div>
+                {/* REMOVED: Department selection */}
                 <div className="flex justify-end gap-3">
                   <button
                     onClick={() => setShowParticularForm(false)}

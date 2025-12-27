@@ -227,3 +227,31 @@ class BillSummary(BaseModel):
     ip_count: int
     ip_total: float
     total_revenue: float
+
+# Department Schemas (Minimal)
+class DepartmentBase(BaseModel):
+    name: str
+
+class DepartmentCreate(DepartmentBase):
+    pass
+
+class DepartmentResponse(DepartmentBase):
+    id: int
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+# Particular Schemas (Minimal)
+class ParticularBase(BaseModel):
+    name: str
+
+class ParticularCreate(ParticularBase):
+    pass
+
+class ParticularResponse(ParticularBase):
+    id: int
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True

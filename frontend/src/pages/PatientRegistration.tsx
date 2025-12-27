@@ -568,7 +568,7 @@ const PatientRegistration = () => {
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="input-field border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                  className="input-field px-2 py-1.5 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                   placeholder="Enter patient's full name"
                   required
                 />
@@ -582,7 +582,7 @@ const PatientRegistration = () => {
                   type="text"
                   value={formData.age}
                   onChange={(e) => setFormData({ ...formData, age: e.target.value })}
-                  className="input-field border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                  className="input-field px-2 py-1.5 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                   placeholder="e.g., 30 years, 6 months, 7 days"
                   required
                 />
@@ -615,7 +615,7 @@ const PatientRegistration = () => {
                 <textarea
                   value={formData.complaint}
                   onChange={(e) => setFormData({ ...formData, complaint: e.target.value })}
-                  className="input-field border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                  className="input-field px-2 py-1.5 border-gray-300 focus:border-blue-500 focus:ring-blue-500 w-full"
                   rows={3}
                   placeholder="Describe the patient's complaint"
                   required
@@ -639,7 +639,7 @@ const PatientRegistration = () => {
                   type="text"
                   value={formData.house}
                   onChange={(e) => setFormData({ ...formData, house: e.target.value })}
-                  className="input-field border-gray-300 focus:border-green-500 focus:ring-green-500"
+                  className="input-field px-2 py-1.5 border-gray-300 focus:border-green-500 focus:ring-green-500"
                   placeholder="House number"
                 />
               </div>
@@ -652,7 +652,7 @@ const PatientRegistration = () => {
                   type="text"
                   value={formData.street}
                   onChange={(e) => setFormData({ ...formData, street: e.target.value })}
-                  className="input-field border-gray-300 focus:border-green-500 focus:ring-green-500"
+                  className="input-field px-2 py-1.5 border-gray-300 focus:border-green-500 focus:ring-green-500"
                   placeholder="Street name"
                 />
               </div>
@@ -665,7 +665,7 @@ const PatientRegistration = () => {
                   type="text"
                   value={formData.place}
                   onChange={(e) => setFormData({ ...formData, place: e.target.value })}
-                  className="input-field border-gray-300 focus:border-green-500 focus:ring-green-500"
+                  className="input-field px-2 py-1.5 border-gray-300 focus:border-green-500 focus:ring-green-500"
                   placeholder="City/Town"
                   required
                 />
@@ -688,7 +688,7 @@ const PatientRegistration = () => {
                   type="tel"
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className="input-field border-gray-300 focus:border-purple-500 focus:ring-purple-500"
+                  className="input-field px-2 py-1.5 border-gray-300 focus:border-purple-500 focus:ring-purple-500"
                   placeholder="10-digit mobile number"
                   required
                 />
@@ -701,7 +701,7 @@ const PatientRegistration = () => {
                 <select
                   value={formData.doctor_id}
                   onChange={(e) => setFormData({ ...formData, doctor_id: parseInt(e.target.value) })}
-                  className="input-field border-gray-300 focus:border-purple-500 focus:ring-purple-500"
+                  className="input-field px-2 py-1.5 border-gray-300 focus:border-purple-500 focus:ring-purple-500"
                   required
                 >
                   <option value="">Select Doctor</option>
@@ -721,7 +721,7 @@ const PatientRegistration = () => {
                   type="text"
                   value={formData.referred_by}
                   onChange={(e) => setFormData({ ...formData, referred_by: e.target.value })}
-                  className="input-field border-gray-300 focus:border-purple-500 focus:ring-purple-500"
+                  className="input-field px-2 py-1.5 border-gray-300 focus:border-purple-500 focus:ring-purple-500"
                   placeholder="Referring doctor/clinic"
                 />
               </div>
@@ -735,7 +735,7 @@ const PatientRegistration = () => {
                     type="text"
                     value={formData.room}
                     onChange={(e) => setFormData({ ...formData, room: e.target.value })}
-                    className="input-field border-gray-300 focus:border-purple-500 focus:ring-purple-500"
+                    className="input-field px-2 py-1.5 border-gray-300 focus:border-purple-500 focus:ring-purple-500"
                     placeholder="e.g., ICU-101, Ward-2A"
                     required={isIP}
                   />

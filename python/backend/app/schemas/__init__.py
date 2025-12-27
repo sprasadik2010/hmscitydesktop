@@ -7,7 +7,9 @@ from .schemas import (
     IPBillCreate, IPBillResponse,
     DashboardStats,
     OPBillItemCreate, OPBillItemResponse,
-    IPBillItemCreate, IPBillItemResponse
+    IPBillItemCreate, IPBillItemResponse,
+    DepartmentBase, DepartmentCreate, DepartmentResponse,
+    ParticularBase, ParticularCreate, ParticularResponse
 )
 
 __all__ = [
@@ -19,5 +21,7 @@ __all__ = [
     "IPBillCreate", "IPBillResponse",
     "DashboardStats",
     "OPBillItemCreate", "OPBillItemResponse",
-    "IPBillItemCreate", "IPBillItemResponse"
+    "IPBillItemCreate", "IPBillItemResponse",
+    "DepartmentBase", "DepartmentCreate", "DepartmentResponse",
+    "ParticularBase", "ParticularCreate", "ParticularResponse"
 ]

@@ -315,7 +315,7 @@ const DoctorMaster = () => {
                     type="text"
                     value={formData.code}
                     onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                    className="input-field border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                    className="input-field px-2 py-1.5 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                     placeholder="JS"
                     required
                   />
@@ -329,7 +329,7 @@ const DoctorMaster = () => {
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="input-field border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                    className="input-field px-2 py-1.5 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                     placeholder="John Smith"
                     required
                   />
@@ -343,7 +343,7 @@ const DoctorMaster = () => {
                     type="text"
                     value={formData.qualification}
                     onChange={(e) => setFormData({ ...formData, qualification: e.target.value })}
-                    className="input-field border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                    className="input-field px-2 py-1.5 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                     placeholder="MBBS, MD"
                   />
                 </div>
@@ -365,7 +365,7 @@ const DoctorMaster = () => {
                     type="text"
                     value={formData.specialty}
                     onChange={(e) => setFormData({ ...formData, specialty: e.target.value })}
-                    className="input-field border-gray-300 focus:border-green-500 focus:ring-green-500"
+                    className="input-field px-2 py-1.5 border-gray-300 focus:border-green-500 focus:ring-green-500"
                     placeholder="Cardiology"
                     required
                   />
@@ -378,7 +378,7 @@ const DoctorMaster = () => {
                   <select
                     value={formData.department}
                     onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                    className="input-field border-gray-300 focus:border-green-500 focus:ring-green-500"
+                    className="input-field px-2 py-1.5 border-gray-300 focus:border-green-500 focus:ring-green-500"
                     required
                   >
                     <option value="">Select Department</option>
@@ -407,7 +407,7 @@ const DoctorMaster = () => {
                     type="tel"
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="input-field border-gray-300 focus:border-purple-500 focus:ring-purple-500"
+                    className="input-field px-2 py-1.5 border-gray-300 focus:border-purple-500 focus:ring-purple-500"
                     placeholder="10-digit mobile number"
                   />
                 </div>
@@ -420,7 +420,7 @@ const DoctorMaster = () => {
                     type="email"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="input-field border-gray-300 focus:border-purple-500 focus:ring-purple-500"
+                    className="input-field px-2 py-1.5 border-gray-300 focus:border-purple-500 focus:ring-purple-500"
                     placeholder="doctor@hospital.com"
                   />
                 </div>
@@ -432,7 +432,7 @@ const DoctorMaster = () => {
                   <textarea
                     value={formData.address}
                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                    className="input-field border-gray-300 focus:border-purple-500 focus:ring-purple-500"
+                    className="input-field px-2 py-1.5 w-full border-gray-300 focus:border-purple-500 focus:ring-purple-500"
                     rows={2}
                     placeholder="Full address"
                   />
@@ -455,7 +455,7 @@ const DoctorMaster = () => {
                     type="time"
                     value={formData.from_time}
                     onChange={(e) => setFormData({ ...formData, from_time: e.target.value })}
-                    className="input-field border-gray-300 focus:border-orange-500 focus:ring-orange-500"
+                    className="input-field px-2 py-1.5 border-gray-300 focus:border-orange-500 focus:ring-orange-500"
                   />
                 </div>
 
@@ -467,7 +467,7 @@ const DoctorMaster = () => {
                     type="time"
                     value={formData.to_time}
                     onChange={(e) => setFormData({ ...formData, to_time: e.target.value })}
-                    className="input-field border-gray-300 focus:border-orange-500 focus:ring-orange-500"
+                    className="input-field px-2 py-1.5 border-gray-300 focus:border-orange-500 focus:ring-orange-500"
                   />
                 </div>
 
@@ -479,7 +479,7 @@ const DoctorMaster = () => {
                     type="number"
                     value={formData.op_validity}
                     onChange={(e) => setFormData({ ...formData, op_validity: parseInt(e.target.value) })}
-                    className="input-field border-gray-300 focus:border-orange-500 focus:ring-orange-500"
+                    className="input-field px-2 py-1.5 border-gray-300 focus:border-orange-500 focus:ring-orange-500"
                   />
                 </div>
 
@@ -491,7 +491,7 @@ const DoctorMaster = () => {
                     type="number"
                     value={formData.max_tokens}
                     onChange={(e) => setFormData({ ...formData, max_tokens: parseInt(e.target.value) })}
-                    className="input-field border-gray-300 focus:border-orange-500 focus:ring-orange-500"
+                    className="input-field px-2 py-1.5 border-gray-300 focus:border-orange-500 focus:ring-orange-500"
                   />
                 </div>
 
@@ -503,7 +503,7 @@ const DoctorMaster = () => {
                     type="text"
                     value={formData.booking_code}
                     onChange={(e) => setFormData({ ...formData, booking_code: e.target.value })}
-                    className="input-field border-gray-300 focus:border-orange-500 focus:ring-orange-500"
+                    className="input-field px-2 py-1.5 border-gray-300 focus:border-orange-500 focus:ring-orange-500"
                     placeholder="GP01"
                   />
                 </div>
@@ -526,7 +526,7 @@ const DoctorMaster = () => {
                     step="0.01"
                     value={formData.doctor_amount}
                     onChange={(e) => setFormData({ ...formData, doctor_amount: parseFloat(e.target.value) })}
-                    className="input-field border-gray-300 focus:border-yellow-500 focus:ring-yellow-500"
+                    className="input-field px-2 py-1.5 border-gray-300 focus:border-yellow-500 focus:ring-yellow-500"
                   />
                 </div>
 
@@ -539,7 +539,7 @@ const DoctorMaster = () => {
                     step="0.01"
                     value={formData.hospital_amount}
                     onChange={(e) => setFormData({ ...formData, hospital_amount: parseFloat(e.target.value) })}
-                    className="input-field border-gray-300 focus:border-yellow-500 focus:ring-yellow-500"
+                    className="input-field px-2 py-1.5 border-gray-300 focus:border-yellow-500 focus:ring-yellow-500"
                   />
                 </div>
 
@@ -552,7 +552,7 @@ const DoctorMaster = () => {
                     step="0.01"
                     value={formData.doctor_revisit}
                     onChange={(e) => setFormData({ ...formData, doctor_revisit: parseFloat(e.target.value) })}
-                    className="input-field border-gray-300 focus:border-yellow-500 focus:ring-yellow-500"
+                    className="input-field px-2 py-1.5 border-gray-300 focus:border-yellow-500 focus:ring-yellow-500"
                   />
                 </div>
 
@@ -565,7 +565,7 @@ const DoctorMaster = () => {
                     step="0.01"
                     value={formData.hospital_revisit}
                     onChange={(e) => setFormData({ ...formData, hospital_revisit: parseFloat(e.target.value) })}
-                    className="input-field border-gray-300 focus:border-yellow-500 focus:ring-yellow-500"
+                    className="input-field px-2 py-1.5 border-gray-300 focus:border-yellow-500 focus:ring-yellow-500"
                   />
                 </div>
               </div>
@@ -617,7 +617,7 @@ const DoctorMaster = () => {
                       type="date"
                       value={formData.resignation_date}
                       onChange={(e) => setFormData({ ...formData, resignation_date: e.target.value })}
-                      className="input-field border-gray-300 focus:border-red-500 focus:ring-red-500 w-64"
+                      className="input-field px-2 py-1.5 border-gray-300 focus:border-red-500 focus:ring-red-500 w-64"
                     />
                   </div>
                 )}

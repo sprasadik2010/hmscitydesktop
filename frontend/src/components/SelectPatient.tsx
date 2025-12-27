@@ -105,7 +105,7 @@ const SelectPatient = () => {
                 <select
                   value={searchBy}
                   onChange={(e) => setSearchBy(e.target.value)}
-                  className="input-field"
+                  className="input-field px-2 py-1.5"
                 >
                   {searchOptions.map(option => (
                     <option key={option.value} value={option.value}>
@@ -121,7 +121,7 @@ const SelectPatient = () => {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder={`Enter ${searchOptions.find(o => o.value === searchBy)?.label.toLowerCase()}...`}
-                  className="input-field"
+                  className="input-field px-2 py-1.5"
                 />
               </div>
               

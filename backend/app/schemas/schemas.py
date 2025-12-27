@@ -245,14 +245,12 @@ class DepartmentResponse(DepartmentBase):
 # Particular Schemas (Minimal)
 class ParticularBase(BaseModel):
     name: str
-    department_id: int
 
 class ParticularCreate(ParticularBase):
     pass
 
 class ParticularResponse(ParticularBase):
     id: int
-    department_name: Optional[str] = None
     created_at: datetime
     
     class Config:

@@ -1,13 +1,72 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
 import { Download, Filter, Calendar, Printer, FileText, BarChart3, Users, CreditCard, TrendingUp, Building, ArrowUpRight, TestTube } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format, isValid, parseISO } from 'date-fns'
 
+interface Particular {
+  id: number;
+  name: string;
+  created_at: string;
+}
+
+interface ReportData {
+  total_amount?: number;
+  total_op_amount?: number;
+  total_ip_amount?: number;
+  total_count?: number;
+  particular_name?: string;
+  op_details: Array<{
+    bill_number: string;
+    patient_name: string;
+    patient_age: string;
+    patient_gender: string;
+    bill_date: string;
+    particular: string;
+    department: string;
+    quantity: number;
+    rate: number;
+    total: number;
+  }>;
+  ip_details: Array<{
+    bill_number: string;
+    patient_name: string;
+    patient_age: string;
+    patient_gender: string;
+    bill_date: string;
+    particular: string;
+    department: string;
+    quantity: number;
+    rate: number;
+    total: number;
+  }>;
+  summary_by_date: Array<{
+    date: string;
+    op_count: number;
+    ip_count: number;
+    total_amount: number;
+  }>;
+  grouped_by_patient?: Array<any>;
+  op_bills?: Array<any>;
+  ip_bills?: Array<any>;
+}
+
+// Helper function to safely parse amounts
+const parseAmount = (amount: any): number => {
+  if (amount === null || amount === undefined) return 0;
+  
+  // Try to parse as number
+  const num = typeof amount === 'string' 
+    ? parseFloat(amount.replace(/[^0-9.-]+/g, '')) 
+    : Number(amount);
+    
+  return isNaN(num) ? 0 : num;
+};
+
 const Reports = () => {
   const [activeReport, setActiveReport] = useState('daily-op')
   const [isLoading, setIsLoading] = useState(false)
-  const [reportData, setReportData] = useState<any>(null)
+  const [reportData, setReportData] = useState<ReportData | any[] | null>(null)
 
   // Common filters
   const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-dd'))
@@ -15,12 +74,15 @@ const Reports = () => {
   const [doctorId] = useState('')
 
   // Particulars report filters
-  const [particularName, setParticularName] = useState('X-RAY')
+  const [particularName, setParticularName] = useState('')
+  const [particularId, setParticularId] = useState<number>(0)
   const [includeOp, setIncludeOp] = useState(true)
   const [includeIp, setIncludeIp] = useState(true)
   const [groupByPatient, setGroupByPatient] = useState(false)
-  const [particularsList, setParticularsList] = useState<string[]>([])
-  const [isLoadingParticulars, setIsLoadingParticulars] = useState(false)
+
+  const [particulars, setParticulars] = useState<Particular[]>([])
+  const [particularsLoaded, setParticularsLoaded] = useState(false)
+  const initialMount = useRef(true)
 
   const reportTypes = [
     {
@@ -57,7 +119,22 @@ const Reports = () => {
   const formatSafeDate = (dateString: string | null | undefined, formatStr: string) => {
     if (!dateString) return 'N/A';
     try {
-      const date = parseISO(dateString);
+      let date: Date;
+      if (dateString.includes('T')) {
+        date = parseISO(dateString);
+      } else {
+        date = new Date(dateString);
+      }
+      
+      if (!isValid(date)) {
+        const timestamp = Date.parse(dateString);
+        if (!isNaN(timestamp)) {
+          date = new Date(timestamp);
+        } else {
+          return 'N/A';
+        }
+      }
+      
       if (!isValid(date)) return 'N/A';
       return format(date, formatStr);
     } catch {
@@ -65,126 +142,196 @@ const Reports = () => {
     }
   };
 
-  const fetchParticularsList = async (search: string = '') => {
-    setIsLoadingParticulars(true)
+  const fetchParticulars = async () => {
     try {
-      const response = await axios.get('/reports/particulars-list', {
-        params: { search, limit: 20 }
+      const response = await axios.get('/settings/particulars', {
+        params: { active_only: false }
       })
-      setParticularsList(response.data.particulars)
+      const fetchedParticulars = response.data;
+      setParticulars(fetchedParticulars);
+      setParticularsLoaded(true);
+
+      // Always set default particular if none is selected
+      if (fetchedParticulars.length > 0) {
+        setParticularName(fetchedParticulars[0].name);
+        setParticularId(fetchedParticulars[0].id);
+      }
     } catch (error) {
-      console.error('Failed to fetch particulars list')
-      setParticularsList([])
-    } finally {
-      setIsLoadingParticulars(false)
+      console.error('Error fetching particulars:', error);
+      toast.error('Failed to load particulars');
+      setParticularsLoaded(true);
     }
   }
 
   const fetchReport = async () => {
     setIsLoading(true)
-    setReportData(null) // Clear previous data before fetching new
+    setReportData(null)
+    
     try {
-      let response
+      let endpoint = '';
+      let params: any = {};
 
       switch (activeReport) {
         case 'daily-op':
-          response = await axios.get('/reports/daily-op', {
-            params: { report_date: startDate }
-          })
-          break
+          endpoint = '/reports/daily-op';
+          params = { report_date: startDate };
+          break;
 
         case 'bill-summary':
-          response = await axios.get('/reports/bill-summary', {
-            params: { start_date: startDate, end_date: endDate }
-          })
-          break
+          endpoint = '/reports/bill-summary';
+          params = { start_date: startDate, end_date: endDate };
+          break;
 
         case 'patient-list':
-          response = await axios.get('/reports/patient-list', {
-            params: { start_date: startDate, end_date: endDate }
-          })
-          break
+          endpoint = '/reports/patient-list';
+          params = { start_date: startDate, end_date: endDate };
+          break;
 
         case 'particulars-report':
-          response = await axios.get('/reports/particulars-report', {
-            params: {
-              particular_name: particularName,
-              start_date: startDate,
-              end_date: endDate,
-              include_op: includeOp,
-              include_ip: includeIp,
-              group_by_patient: groupByPatient
-            }
-          })
-          break
+          endpoint = '/reports/particulars-report';
+          params = {
+            particular_id: particularId,
+            start_date: startDate,
+            end_date: endDate,
+            include_op: includeOp,
+            include_ip: includeIp,
+            group_by_patient: groupByPatient
+          };
+          
+          if (particularId === 0) {
+            toast.error('Please select a particular first');
+            setIsLoading(false);
+            return;
+          }
+          break;
 
         default:
-          response = await axios.get('/reports/daily-op')
+          endpoint = '/reports/daily-op';
       }
 
-      setReportData(response.data)
-    } catch (error) {
-      toast.error('Failed to fetch report')
-      setReportData(null)
+      console.log(`Fetching ${endpoint} with params:`, params);
+      
+      const response = await axios.get(endpoint, { params });
+      console.log('API Response:', response.data);
+      
+      setReportData(response.data);
+      
+      if (response.data && (
+        (Array.isArray(response.data) && response.data.length > 0) ||
+        (!Array.isArray(response.data) && Object.keys(response.data).length > 0)
+      )) {
+        toast.success('Report loaded successfully');
+      }
+    } catch (error: any) {
+      console.error('Failed to fetch report:', error);
+      toast.error(error.response?.data?.message || 'Failed to fetch report');
+      setReportData(null);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
   }
 
   useEffect(() => {
-    fetchReport()
-  }, [activeReport, startDate, endDate, doctorId])
+    fetchParticulars();
+  }, []);
 
   useEffect(() => {
-    fetchParticularsList()
-  }, [])
+    if (initialMount.current) {
+      initialMount.current = false;
+      return;
+    }
+    
+    const timeoutId = setTimeout(() => {
+      if (activeReport === 'particulars-report') {
+        if (!particularsLoaded) return;
+        if (particularId === 0) return;
+      }
+      
+      fetchReport();
+    }, 300);
+    
+    return () => clearTimeout(timeoutId);
+  }, [activeReport, startDate, endDate, doctorId, particularId, includeOp, includeIp, groupByPatient, particularsLoaded]);
 
   const getTotalRevenue = () => {
-    if (!reportData) return 0
+    if (!reportData) return 0;
 
     if (activeReport === 'daily-op') {
       return Array.isArray(reportData)
-        ? reportData.reduce((sum: number, bill: any) => sum + (bill.net_amount || 0), 0)
-        : 0
+        ? reportData.reduce((sum: number, bill: any) => sum + parseAmount(bill.net_amount), 0)
+        : 0;
     } else if (activeReport === 'bill-summary') {
-      return reportData.total_amount || 0
+      const data = reportData as ReportData;
+      return parseAmount(data.total_amount);
     } else if (activeReport === 'particulars-report') {
-      return reportData.total_amount || 0
+      const data = reportData as ReportData;
+      
+      // Always calculate from details for particulars report
+      const opDetails = data?.op_details || [];
+      const ipDetails = data?.ip_details || [];
+      
+      const opTotal = opDetails.reduce((sum, item) => sum + parseAmount(item.total), 0);
+      const ipTotal = ipDetails.reduce((sum, item) => sum + parseAmount(item.total), 0);
+      
+      return opTotal + ipTotal;
     }
-    return 0
+    return 0;
+  }
+
+  const getRecordCount = () => {
+    if (!reportData) return 0;
+
+    if (activeReport === 'patient-list') {
+      if (Array.isArray(reportData)) {
+        return reportData.length;
+      }
+    } else if (activeReport === 'daily-op') {
+      if (Array.isArray(reportData)) {
+        return reportData.length;
+      }
+    } else if (activeReport === 'bill-summary') {
+      const data = reportData as ReportData;
+      return (data.op_bills?.length || 0) + (data.ip_bills?.length || 0);
+    } else if (activeReport === 'particulars-report') {
+      const data = reportData as ReportData;
+      const opDetails = data?.op_details || [];
+      const ipDetails = data?.ip_details || [];
+      return opDetails.length + ipDetails.length;
+    }
+    return 0;
   }
 
   const handlePrint = () => {
-    let title
-    let totalBills = getRecordCount()
-    let totalRevenue = getTotalRevenue().toFixed(2)
+    if (!reportData) return;
+    
+    let title = '';
+    let totalBills = getRecordCount();
+    let totalRevenue = getTotalRevenue().toFixed(2);
+    
     switch (activeReport) {
       case 'daily-op':
-        title = 'OP Report'
-        break
-
+        title = 'OP Report';
+        break;
       case 'bill-summary':
-        title = 'IP/OP Bill Summary Report'
-        break
-
+        title = 'IP/OP Bill Summary Report';
+        break;
       case 'patient-list':
-        title = 'Patient List'
-        break
-
+        title = 'Patient List';
+        break;
       case 'particulars-report':
-        title = particularName + ' Summary Report'
-        break
-
+        const data = reportData as ReportData;
+        title = data?.particular_name || particularName || 'Particulars Summary Report';
+        break;
       default:
-        title = ''
+        title = '';
     }
-    
+
     // Create complete HTML document for printing
     let printHTML = `
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Daily OP Report - ${startDate + '-' + endDate || 'Report'}</title>
+    <title>${title} - ${startDate} to ${endDate}</title>
     <meta charset="UTF-8">
     <style>
       @media print {
@@ -591,9 +738,9 @@ const Reports = () => {
                           <td><div class="font-medium">${bill.patient?.name || 'N/A'}</div></td>
                           <td><div class="font-medium">${bill.doctor?.name || 'N/A'}</div></td>
                           <td><span class="bill-type ${bill.bill_type === 'Cash' ? 'cash' : 'insurance'}">${bill.bill_type || 'N/A'}</span></td>
-                          <td>₹${bill.total_amount?.toFixed(2) || '0.00'}</td>
-                          <td>₹${bill.discount_amount?.toFixed(2) || '0.00'}</td>
-                          <td>₹${bill.net_amount?.toFixed(2) || '0.00'}</td>
+                          <td>₹${parseFloat(bill.total_amount || 0).toFixed(2)}</td>
+                          <td>₹${parseFloat(bill.discount_amount || 0).toFixed(2)}</td>
+                          <td>₹${parseFloat(bill.net_amount || 0).toFixed(2)}</td>
                         </tr>
                       `).join('')}
                     </tbody>
@@ -601,43 +748,43 @@ const Reports = () => {
                 </div>`;
     }
     else if (activeReport === 'bill-summary') {
+      const data = reportData as ReportData;
       printHTML += `
             <!-- OP Summary Statistics -->
                 <div class="section-title">Summary Overview</div>
                 <div class="revenue-report-stats">
                   <div class="stat-card blue">
                     <div class="stat-label">Total OP Revenue</div>
-                    <div class="stat-value">₹${reportData?.total_op_amount?.toFixed(2) || '0.00'}</div>
+                    <div class="stat-value">₹${parseAmount(data.total_op_amount).toFixed(2)}</div>
                   </div>
                   <div class="stat-card purple">
                     <div class="stat-label">Total IP Revenue</div>
-                    <div class="stat-value">₹${reportData?.total_ip_amount?.toFixed(2) || '0.00'}</div>
+                    <div class="stat-value">₹${parseAmount(data.total_ip_amount).toFixed(2)}</div>
                   </div>
                   <div class="stat-card green">
                     <div class="stat-label">Total Revenue</div>
-                    <div class="stat-value">₹${reportData?.total_amount?.toFixed(2) || '0.00'}</div>
+                    <div class="stat-value">₹${parseAmount(data.total_amount).toFixed(2)}</div>
                   </div>
                 </div>`;
     }
     else if (activeReport === 'patient-list' && Array.isArray(reportData)) {
-      // Process patient list data - check if it's bill data or patient data
-      const patientsList = reportData[0]?.patient 
+      const patientsList = reportData[0]?.patient
         ? reportData.map((bill: any) => ({
-            ...bill.patient,
-            type: bill.patient?.is_ip ? 'INPATIENT' : 'OUTPATIENT',
-            registration_date: bill.patient?.registration_date,
-            address: [bill.patient?.house, bill.patient?.street, bill.patient?.place].filter(Boolean).join(', ')
-          }))
+          ...bill.patient,
+          type: bill.patient?.is_ip ? 'INPATIENT' : 'OUTPATIENT',
+          registration_date: bill.patient?.registration_date,
+          address: [bill.patient?.house, bill.patient?.street, bill.patient?.place].filter(Boolean).join(', ')
+        }))
         : reportData.map((patient: any) => ({
-            ...patient,
-            type: patient.is_ip ? 'INPATIENT' : 'OUTPATIENT',
-            registration_date: patient.registration_date,
-            address: [patient.house, patient.street, patient.place].filter(Boolean).join(', ')
-          }));
-      
+          ...patient,
+          type: patient.is_ip ? 'INPATIENT' : 'OUTPATIENT',
+          registration_date: patient.registration_date,
+          address: [patient.house, patient.street, patient.place].filter(Boolean).join(', ')
+        }));
+
       const opPatients = patientsList.filter((p: any) => !p.is_ip).length;
       const ipPatients = patientsList.filter((p: any) => p.is_ip).length;
-      
+
       printHTML += `
     <div class="space-y-6">
       <!-- Summary Card -->
@@ -710,20 +857,26 @@ const Reports = () => {
     </div>`;
     }
     else if (activeReport === 'particulars-report') {
+      const data = reportData as ReportData;
+      const opDetails = data?.op_details || [];
+      const ipDetails = data?.ip_details || [];
+      const totalCount = opDetails.length + ipDetails.length;
+      const revenue = getTotalRevenue();
+      
       printHTML += `
-      <div class="section-title">Particulars Report - ${particularName}</div>
+      <div class="section-title">Particulars Report - ${data.particular_name || particularName}</div>
       <div class="op-summary-stats">
         <div class="stat-card blue">
           <div class="stat-label">Total Count</div>
-          <div class="stat-value">${reportData?.total_count || 0}</div>
+          <div class="stat-value">${totalCount}</div>
         </div>
         <div class="stat-card green">
           <div class="stat-label">Total Revenue</div>
-          <div class="stat-value">₹${reportData?.total_amount?.toFixed(2) || '0.00'}</div>
+          <div class="stat-value">₹${revenue.toFixed(2)}</div>
         </div>
       </div>`;
     }
-    
+
     printHTML += `<div class="generated-info">
           Report generated on ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })} at ${new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
         </div>
@@ -752,15 +905,22 @@ const Reports = () => {
       iframeDoc.write(printHTML);
       iframeDoc.close();
 
-      // Wait for content to load
       iframe.onload = () => {
-        // Focus the iframe for better print dialog behavior
         iframe.contentWindow?.focus();
-
-        // Auto-print (optional - you can remove this if you want manual print button)
+        
         setTimeout(() => {
           iframe.contentWindow?.print();
+          
+          setTimeout(() => {
+            document.body.removeChild(iframe);
+          }, 1000);
         }, 1000);
+      };
+      
+      iframe.onerror = () => {
+        console.error('Failed to load iframe for printing');
+        document.body.removeChild(iframe);
+        toast.error('Failed to prepare print document');
       };
     } else {
       console.error('Could not access iframe document');
@@ -769,40 +929,31 @@ const Reports = () => {
   };
 
   const handleExport = () => {
-    if (!reportData) return
+    if (!reportData) return;
 
-    const dataStr = JSON.stringify(reportData, null, 2)
-    const dataBlob = new Blob([dataStr], { type: 'application/json' })
-    const url = URL.createObjectURL(dataBlob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `${activeReport}-${format(new Date(), 'yyyy-MM-dd')}.json`
-    link.click()
-    URL.revokeObjectURL(url)
-    toast.success('Report exported successfully')
-  }
-
-  const getRecordCount = () => {
-    if (!reportData) return 0
-
-    if (activeReport === 'patient-list') {
-      if (Array.isArray(reportData)) {
-        return reportData.length;
-      }
-    } else if (activeReport === 'daily-op') {
-      if (Array.isArray(reportData)) {
-        return reportData.length;
-      }
-    } else if (activeReport === 'bill-summary') {
-      return (reportData.op_bills?.length || 0) + (reportData.ip_bills?.length || 0)
-    } else if (activeReport === 'particulars-report') {
-      return reportData.total_count || 0
-    }
-    return 0
+    const dataStr = JSON.stringify(reportData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${activeReport}-${format(new Date(), 'yyyy-MM-dd')}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success('Report exported successfully');
   }
 
   const renderParticularsReport = () => {
-    if (!reportData) return null
+    if (!reportData) return null;
+
+    const data = reportData as ReportData;
+    const displayParticularName = data.particular_name || particularName;
+    
+    const opDetails = data.op_details || [];
+    const ipDetails = data.ip_details || [];
+    const totalCount = opDetails.length + ipDetails.length;
+    const summaryByDate = data.summary_by_date || [];
+    
+    const totalRevenue = getTotalRevenue();
 
     return (
       <div className="space-y-6">
@@ -812,19 +963,18 @@ const Reports = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Particular</p>
-                <p className="text-xl font-bold text-gray-900 truncate">{reportData.particular_name}</p>
+                <p className="text-xl font-bold text-gray-900 truncate">{displayParticularName}</p>
               </div>
               <div className="p-3 bg-teal-100 rounded-lg">
                 <TestTube className="text-teal-600" size={24} />
               </div>
             </div>
           </div>
-
           <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl p-6 border border-blue-200">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Total Count</p>
-                <p className="text-2xl font-bold text-gray-900">{reportData.total_count || 0}</p>
+                <p className="text-2xl font-bold text-gray-900">{totalCount}</p>
               </div>
               <div className="p-3 bg-blue-100 rounded-lg">
                 <BarChart3 className="text-blue-600" size={24} />
@@ -836,7 +986,7 @@ const Reports = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">OP Count</p>
-                <p className="text-2xl font-bold text-gray-900">{reportData.op_details?.length || 0}</p>
+                <p className="text-2xl font-bold text-gray-900">{opDetails.length}</p>
               </div>
               <div className="p-3 bg-green-100 rounded-lg">
                 <FileText className="text-green-600" size={24} />
@@ -848,7 +998,7 @@ const Reports = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">IP Count</p>
-                <p className="text-2xl font-bold text-gray-900">{reportData.ip_details?.length || 0}</p>
+                <p className="text-2xl font-bold text-gray-900">{ipDetails.length}</p>
               </div>
               <div className="p-3 bg-purple-100 rounded-lg">
                 <Building className="text-purple-600" size={24} />
@@ -861,9 +1011,9 @@ const Reports = () => {
         <div className="bg-gradient-to-r from-green-100 to-emerald-100 rounded-xl p-6 border border-green-300">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-700">Total Revenue from {reportData.particular_name}</p>
+              <p className="text-sm font-medium text-gray-700">Total Revenue from {displayParticularName}</p>
               <p className="text-3xl font-bold text-green-800">
-                ₹{(reportData.total_amount || 0).toFixed(2)}
+                ₹{totalRevenue.toFixed(2)}
               </p>
               <p className="text-sm text-gray-600 mt-1">
                 Period: {format(new Date(startDate), 'dd/MM/yyyy')} - {format(new Date(endDate), 'dd/MM/yyyy')}
@@ -876,7 +1026,7 @@ const Reports = () => {
         </div>
 
         {/* Summary by Date */}
-        {reportData.summary_by_date && reportData.summary_by_date.length > 0 && (
+        {summaryByDate.length > 0 && (
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
               <Calendar className="mr-2 text-blue-600" size={20} />
@@ -893,8 +1043,8 @@ const Reports = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {reportData.summary_by_date.map((item: any, index: number) => (
-                    <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                  {summaryByDate.map((item, index) => (
+                    <tr key={`summary-${index}`} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                       <td className="px-4 py-3 whitespace-nowrap font-medium text-gray-900">
                         {item.date ? formatSafeDate(item.date, 'dd/MM/yyyy') : 'N/A'}
                       </td>
@@ -909,7 +1059,7 @@ const Reports = () => {
                         </span>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap font-bold text-green-700">
-                        ₹{(item.total_amount || 0).toFixed(2)}
+                        ₹{parseAmount(item.total_amount).toFixed(2)}
                       </td>
                     </tr>
                   ))}
@@ -920,107 +1070,79 @@ const Reports = () => {
         )}
 
         {/* Detailed Data Table */}
-        <div className="overflow-x-auto rounded-xl border border-gray-200">
-          <div className="bg-gradient-to-r from-teal-50 to-teal-100 p-4 border-b border-teal-200">
-            <h3 className="text-lg font-bold text-gray-900">
-              Detailed Records ({reportData.total_count || 0})
-            </h3>
-          </div>
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Bill No</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Type</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Patient</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Date</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Particular</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Qty</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Rate</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Total</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {reportData.op_details?.map((item: any, index: number) => (
-                <tr key={`op-${index}`} className={index % 2 === 0 ? 'bg-white' : 'bg-blue-50'}>
-                  <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">{item.bill_number}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">OP</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="font-medium text-gray-900">{item.patient_name}</div>
-                    <div className="text-sm text-gray-600">{item.patient_age} • {item.patient_gender}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {formatSafeDate(item.bill_date, 'dd/MM/yyyy')}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="font-medium text-gray-900">{item.particular}</div>
-                    <div className="text-sm text-gray-600">{item.department}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">{item.quantity}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">₹{item.rate?.toFixed(2) || '0.00'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap font-bold text-green-700">₹{item.total?.toFixed(2) || '0.00'}</td>
-                </tr>
-              ))}
-
-              {reportData.ip_details?.map((item: any, index: number) => (
-                <tr key={`ip-${index}`} className={index % 2 === 0 ? 'bg-white' : 'bg-purple-50'}>
-                  <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">{item.bill_number}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="px-2 py-1 text-xs font-medium bg-purple-100 text-purple-800 rounded-full">IP</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="font-medium text-gray-900">{item.patient_name}</div>
-                    <div className="text-sm text-gray-600">{item.patient_age} • {item.patient_gender}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {formatSafeDate(item.bill_date, 'dd/MM/yyyy')}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="font-medium text-gray-900">{item.particular}</div>
-                    <div className="text-sm text-gray-600">{item.department}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">{item.quantity}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">₹{item.rate?.toFixed(2) || '0.00'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap font-bold text-green-700">₹{item.total?.toFixed(2) || '0.00'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Grouped by Patient */}
-        {groupByPatient && reportData.grouped_by_patient && (
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
-              <Users className="mr-2 text-purple-600" size={20} />
-              Grouped by Patient
-            </h3>
-            <div className="space-y-4">
-              {reportData.grouped_by_patient.map((patient: any, index: number) => (
-                <div key={index} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <h4 className="font-bold text-gray-900">{patient.patient_name}</h4>
-                      <p className="text-sm text-gray-600">
-                        {patient.patient_age} • {patient.patient_gender} • Total: {patient.total_count} procedures
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-lg font-bold text-green-700">₹{patient.total_amount?.toFixed(2)}</p>
-                    </div>
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    Procedures: {patient.details?.map((d: any) => d.particular).join(', ')}
-                  </div>
-                </div>
-              ))}
+        {totalCount > 0 && (
+          <div className="overflow-x-auto rounded-xl border border-gray-200">
+            <div className="bg-gradient-to-r from-teal-50 to-teal-100 p-4 border-b border-teal-200">
+              <h3 className="text-lg font-bold text-gray-900">
+                Detailed Records ({totalCount})
+              </h3>
             </div>
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Bill No</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Type</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Patient</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Date</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Particular</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Qty</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Rate</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Total</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {opDetails.map((item, index) => (
+                  <tr key={`op-${index}`} className={index % 2 === 0 ? 'bg-white' : 'bg-blue-50'}>
+                    <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">{item.bill_number || 'N/A'}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">OP</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="font-medium text-gray-900">{item.patient_name || 'N/A'}</div>
+                      <div className="text-sm text-gray-600">{item.patient_age || 'N/A'} • {item.patient_gender || 'N/A'}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {formatSafeDate(item.bill_date, 'dd/MM/yyyy')}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="font-medium text-gray-900">{item.particular || 'N/A'}</div>
+                      <div className="text-sm text-gray-600">{item.department || 'N/A'}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">{item.quantity || 0}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">₹{parseAmount(item.rate).toFixed(2)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap font-bold text-green-700">₹{parseAmount(item.total).toFixed(2)}</td>
+                  </tr>
+                ))}
+
+                {ipDetails.map((item, index) => (
+                  <tr key={`ip-${index}`} className={index % 2 === 0 ? 'bg-white' : 'bg-purple-50'}>
+                    <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">{item.bill_number || 'N/A'}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="px-2 py-1 text-xs font-medium bg-purple-100 text-purple-800 rounded-full">IP</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="font-medium text-gray-900">{item.patient_name || 'N/A'}</div>
+                      <div className="text-sm text-gray-600">{item.patient_age || 'N/A'} • {item.patient_gender || 'N/A'}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {formatSafeDate(item.bill_date, 'dd/MM/yyyy')}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="font-medium text-gray-900">{item.particular || 'N/A'}</div>
+                      <div className="text-sm text-gray-600">{item.department || 'N/A'}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">{item.quantity || 0}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">₹{parseAmount(item.rate).toFixed(2)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap font-bold text-green-700">₹{parseAmount(item.total).toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
-    )
-  }
+    );
+  };
 
   const renderReportContent = () => {
     if (isLoading) {
@@ -1029,7 +1151,7 @@ const Reports = () => {
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mb-4"></div>
           <p className="text-gray-600">Loading report data...</p>
         </div>
-      )
+      );
     }
 
     if (!reportData) {
@@ -1044,12 +1166,11 @@ const Reports = () => {
             }
           </p>
         </div>
-      )
+      );
     }
 
     switch (activeReport) {
       case 'daily-op':
-        // Check if reportData is in the correct format for daily-op
         if (!Array.isArray(reportData) || (reportData.length > 0 && !reportData[0]?.bill_number)) {
           return (
             <div className="text-center py-16 bg-gradient-to-b from-gray-50 to-white rounded-xl">
@@ -1064,7 +1185,6 @@ const Reports = () => {
 
         return (
           <div className="space-y-6">
-            {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl p-6 border border-blue-200">
                 <div className="flex items-center justify-between">
@@ -1127,7 +1247,6 @@ const Reports = () => {
               </div>
             </div>
 
-            {/* Data Table */}
             <div className="overflow-x-auto rounded-xl border border-gray-200">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
@@ -1157,7 +1276,7 @@ const Reports = () => {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {Array.isArray(reportData) && reportData.map((bill: any, index: number) => (
-                    <tr key={bill.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                    <tr key={bill.id || index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="font-medium text-gray-900">{bill.bill_number}</div>
                         <div className="text-sm text-gray-600">{formatSafeDate(bill.bill_date, 'HH:mm')}</div>
@@ -1179,12 +1298,12 @@ const Reports = () => {
                           {bill.bill_type}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap font-medium">₹{bill.total_amount?.toFixed(2)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap font-medium">₹{parseAmount(bill.total_amount).toFixed(2)}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-red-600 font-medium">
-                        ₹{bill.discount_amount?.toFixed(2)}
+                        ₹{parseAmount(bill.discount_amount).toFixed(2)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="font-bold text-green-700">₹{bill.net_amount?.toFixed(2)}</div>
+                        <div className="font-bold text-green-700">₹{parseAmount(bill.net_amount).toFixed(2)}</div>
                       </td>
                     </tr>
                   ))}
@@ -1192,19 +1311,19 @@ const Reports = () => {
               </table>
             </div>
           </div>
-        )
+        );
 
       case 'bill-summary':
+        const summaryData = reportData as ReportData;
         return (
           <div className="space-y-6">
-            {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl p-6 border border-blue-200">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-600">OP Revenue</p>
-                    <p className="text-2xl font-bold text-gray-900">₹{reportData?.total_op_amount?.toFixed(2) || '0.00'}</p>
-                    <p className="text-sm text-gray-600 mt-1">{reportData?.op_bills?.length || 0} bills</p>
+                    <p className="text-2xl font-bold text-gray-900">₹{parseAmount(summaryData.total_op_amount).toFixed(2)}</p>
+                    <p className="text-sm text-gray-600 mt-1">{summaryData.op_bills?.length || 0} bills</p>
                   </div>
                   <div className="p-3 bg-blue-100 rounded-lg">
                     <FileText className="text-blue-600" size={24} />
@@ -1216,8 +1335,8 @@ const Reports = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-600">IP Revenue</p>
-                    <p className="text-2xl font-bold text-gray-900">₹{reportData?.total_ip_amount?.toFixed(2) || '0.00'}</p>
-                    <p className="text-sm text-gray-600 mt-1">{reportData?.ip_bills?.length || 0} bills</p>
+                    <p className="text-2xl font-bold text-gray-900">₹{parseAmount(summaryData.total_ip_amount).toFixed(2)}</p>
+                    <p className="text-sm text-gray-600 mt-1">{summaryData.ip_bills?.length || 0} bills</p>
                   </div>
                   <div className="p-3 bg-purple-100 rounded-lg">
                     <Building className="text-purple-600" size={24} />
@@ -1229,7 +1348,7 @@ const Reports = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-600">Total Revenue</p>
-                    <p className="text-3xl font-bold text-green-700">₹{reportData?.total_amount?.toFixed(2) || '0.00'}</p>
+                    <p className="text-3xl font-bold text-green-700">₹{parseAmount(summaryData.total_amount).toFixed(2)}</p>
                     <p className="text-sm text-green-600 mt-1">Combined total</p>
                   </div>
                   <div className="p-3 bg-green-100 rounded-lg">
@@ -1239,7 +1358,6 @@ const Reports = () => {
               </div>
             </div>
 
-            {/* Detailed Table */}
             <div className="overflow-x-auto rounded-xl border border-gray-200">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
@@ -1263,10 +1381,10 @@ const Reports = () => {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {[
-                    ...(reportData?.op_bills || []),
-                    ...(reportData?.ip_bills || [])
+                    ...(summaryData.op_bills || []),
+                    ...(summaryData.ip_bills || [])
                   ].map((bill: any, index: number) => (
-                    <tr key={bill.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                    <tr key={bill.id || index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="font-medium text-gray-900">{bill.bill_number}</div>
                       </td>
@@ -1287,7 +1405,7 @@ const Reports = () => {
                         <div className="text-sm text-gray-600">{formatSafeDate(bill.bill_date, 'HH:mm')}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="font-bold text-green-700">₹{bill.net_amount?.toFixed(2)}</div>
+                        <div className="font-bold text-green-700">₹{parseAmount(bill.net_amount).toFixed(2)}</div>
                       </td>
                     </tr>
                   ))}
@@ -1295,10 +1413,9 @@ const Reports = () => {
               </table>
             </div>
           </div>
-        )
+        );
 
       case 'patient-list':
-        // Check if reportData has the correct structure for patient list
         if (!Array.isArray(reportData)) {
           return (
             <div className="text-center py-16 bg-gradient-to-b from-gray-50 to-white rounded-xl">
@@ -1311,20 +1428,18 @@ const Reports = () => {
           );
         }
 
-        // Process the data based on its structure
-        const patientsList = reportData[0]?.patient 
+        const patientsList = reportData[0]?.patient
           ? reportData.map((bill: any) => ({
-              ...bill.patient,
-              doctor_name: bill.doctor?.name,
-              bill_date: bill.bill_date,
-              bill_number: bill.bill_number,
-              bill_type: bill.bill_type
-            }))
+            ...bill.patient,
+            doctor_name: bill.doctor?.name,
+            bill_date: bill.bill_date,
+            bill_number: bill.bill_number,
+            bill_type: bill.bill_type
+          }))
           : reportData;
 
         return (
           <div className="space-y-6">
-            {/* Summary Card */}
             <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl p-6 border border-purple-200">
               <div className="flex items-center justify-between">
                 <div>
@@ -1351,7 +1466,6 @@ const Reports = () => {
               </div>
             </div>
 
-            {/* Data Table */}
             <div className="overflow-x-auto rounded-xl border border-gray-200">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
@@ -1381,7 +1495,7 @@ const Reports = () => {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {patientsList.map((patient: any, index: number) => (
-                    <tr key={patient.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                    <tr key={patient.id || index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="font-medium text-gray-900">
                           {patient.is_ip ? patient.ip_number : patient.op_number}
@@ -1420,19 +1534,18 @@ const Reports = () => {
               </table>
             </div>
           </div>
-        )
+        );
 
       case 'particulars-report':
-        return renderParticularsReport()
+        return renderParticularsReport();
 
       default:
-        return null
+        return null;
     }
-  }
+  };
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
-      {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl p-8 shadow-xl">
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -1450,16 +1563,21 @@ const Reports = () => {
           </div>
         </div>
 
-        {/* Report Type Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           {reportTypes.map((report) => {
-            const Icon = report.icon
-            const isActive = activeReport === report.id
+            const Icon = report.icon;
+            const isActive = activeReport === report.id;
 
             return (
               <button
                 key={report.id}
-                onClick={() => setActiveReport(report.id)}
+                onClick={() => {
+                  setActiveReport(report.id);
+                  if (report.id === 'particulars-report' && particulars.length > 0 && particularId === 0) {
+                    setParticularName(particulars[0].name);
+                    setParticularId(particulars[0].id);
+                  }
+                }}
                 className={`rounded-2xl p-5 text-left transition-all transform hover:-translate-y-1 ${isActive
                   ? `${report.color} text-white shadow-xl`
                   : 'bg-white/10 backdrop-blur-sm text-white/90 hover:bg-white/20'
@@ -1476,12 +1594,11 @@ const Reports = () => {
                 <h3 className="text-lg font-bold mb-1">{report.label}</h3>
                 <p className="text-sm opacity-90">{report.description}</p>
               </button>
-            )
+            );
           })}
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="bg-white rounded-2xl shadow-lg border border-gray-200">
         <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
           <h2 className="text-xl font-bold text-gray-900 flex items-center">
@@ -1491,7 +1608,6 @@ const Reports = () => {
         </div>
 
         <div className="p-6 space-y-8">
-          {/* Filters Section */}
           {activeReport !== 'daily-op' && (
             <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-2xl p-6 border border-gray-200">
               <div className="flex items-center mb-6">
@@ -1536,7 +1652,6 @@ const Reports = () => {
                 </div>
               </div>
 
-              {/* Particulars Report Filters */}
               {activeReport === 'particulars-report' && (
                 <div className="mt-6 space-y-4">
                   <div className="space-y-2">
@@ -1545,35 +1660,23 @@ const Reports = () => {
                     </label>
                     <div className="relative">
                       <select
-                        value={particularName}
-                        onChange={(e) => setParticularName(e.target.value)}
+                        value={particularId}
+                        onChange={(e) => {
+                          const selectedId = parseInt(e.target.value);
+                          const selectedParticular = particulars.find(p => p.id === selectedId);
+                          setParticularId(selectedId);
+                          if (selectedParticular) {
+                            setParticularName(selectedParticular.name);
+                          }
+                        }}
                         className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent appearance-none bg-white"
                       >
-                        <option value="">Select a particular...</option>
-                        {Array.from(new Set([
-                          'Room Charges',
-                          'Doctor Fees',
-                          'Water Bill',
-                          'Professional Fee',
-                          'Consultation',
-                          'Review',
-                          'Procedure',
-                          'physiotherapy',
-                          'Medicine',
-                          'Test',
-                          'X-Ray',
-                          'ECG',
-                          'Ultrasound',
-                          'Injection',
-                          'Dressing',
-                          'Other'
-                        ]))
-                          .sort((a, b) => a.localeCompare(b))
-                          .map((item, index) => (
-                            <option key={index} value={item}>
-                              {item}
-                            </option>
-                          ))}
+                        <option value={0}>Select a particular</option>
+                        {particulars.map((particular) => (
+                          <option key={particular.id} value={particular.id}>
+                            {particular.name}
+                          </option>
+                        ))}
                       </select>
                       <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
                         <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1586,7 +1689,6 @@ const Reports = () => {
                     </p>
                   </div>
 
-                  {/* Checkboxes */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <label className="flex items-center space-x-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
                       <input
@@ -1624,7 +1726,7 @@ const Reports = () => {
               <div className="flex justify-end space-x-3 mt-6">
                 <button
                   onClick={fetchReport}
-                  disabled={isLoading}
+                  disabled={isLoading || (activeReport === 'particulars-report' && particularId === 0)}
                   className="px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white font-medium rounded-xl hover:from-blue-700 hover:to-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md flex items-center"
                 >
                   {isLoading ? (
@@ -1643,7 +1745,6 @@ const Reports = () => {
             </div>
           )}
 
-          {/* Report Header */}
           <div className="flex flex-col sm:flex-row items-center justify-between space-y-4 sm:space-y-0">
             <div>
               <h3 className="text-xl font-bold text-gray-900">
@@ -1652,12 +1753,12 @@ const Reports = () => {
               {activeReport === 'daily-op' && (
                 <p className="text-gray-600">
                   Generated for the day: {format(new Date(), 'dd MMM yyyy')}
-                </p>                  
+                </p>
               )}
               {activeReport !== 'daily-op' && (
                 <p className="text-gray-600">
                   Generated for period: {format(new Date(startDate), 'dd MMM yyyy')} - {format(new Date(endDate), 'dd MMM yyyy')}
-                </p>                  
+                </p>
               )}
             </div>
 
@@ -1682,12 +1783,10 @@ const Reports = () => {
             </div>
           </div>
 
-          {/* Report Content */}
           <div className="border border-gray-200 rounded-2xl overflow-hidden">
             {renderReportContent()}
           </div>
 
-          {/* Report Summary */}
           {reportData && (
             <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-2xl p-6 border border-gray-200">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1721,7 +1820,7 @@ const Reports = () => {
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default Reports
+export default Reports;

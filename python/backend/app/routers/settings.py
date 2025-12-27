@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime
 
-from database import get_db
+from ...database import get_db
 from .auth import get_current_user
 from ..models import Base, Department, Particular
 from ..schemas import DepartmentCreate, DepartmentResponse, ParticularCreate, ParticularResponse

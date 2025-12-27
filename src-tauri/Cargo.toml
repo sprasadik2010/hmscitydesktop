@@ -10,3 +10,9 @@ dirs = "5.0" # Add this line for accessing standard OS directories
 
 [build-dependencies]
 tauri-build = { version = "2.0", features = [] }
+
+
+# Uncomment following to enable logging
+# [features]
+# default = ["logging"]  # Logging enabled by default
+# logging = []  # You can still disable it with --no-default-features

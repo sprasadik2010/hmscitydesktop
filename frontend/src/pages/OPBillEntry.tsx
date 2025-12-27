@@ -83,8 +83,6 @@ interface Department {
 interface Particular {
   id: number;
   name: string;
-  department_id: number;
-  department_name?: string;
   created_at: string;
 }
 
