@@ -35,7 +35,17 @@ interface Doctor {
 const DoctorMaster = () => {
   const [doctors, setDoctors] = useState<Doctor[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
-  const [formData, setFormData] = useState<Doctor>({
+  
+  const [isEditing, setIsEditing] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [showForm, setShowForm] = useState(false)
+
+  useEffect(() => {
+    fetchDepartments()
+    fetchDoctors()
+  }, [])
+const [formData, setFormData] = useState<Doctor>({
     code: '',
     name: '',
     address: '',
@@ -43,7 +53,7 @@ const DoctorMaster = () => {
     phone: '',
     email: '',
     specialty: '',
-    department: '',
+    department: String(departments.at(0)?.id),
     op_validity: 30,
     booking_code: '',
     max_tokens: 50,
@@ -57,16 +67,6 @@ const DoctorMaster = () => {
     is_discontinued: false,
     resignation_date: ''
   })
-
-  const [isEditing, setIsEditing] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [showForm, setShowForm] = useState(false)
-
-  useEffect(() => {
-    fetchDepartments()
-    fetchDoctors()
-  }, [])
 
   const fetchDoctors = async () => {
     try {
@@ -377,11 +377,11 @@ const DoctorMaster = () => {
                   </label>
                   <select
                     value={formData.department}
-                    onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                    onChange={(e) => setFormData({ ...formData, department: String(e.target.value) })}
                     className="input-field px-2 py-1.5 border-gray-300 focus:border-green-500 focus:ring-green-500"
                     required
                   >
-                    <option value="">Select Department</option>
+                    <option value="0">Please select a department</option>
                     {departments.map((dept) => (
                       <option key={dept.id} value={dept.id}>
                         {dept.name}

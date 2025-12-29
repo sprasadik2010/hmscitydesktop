@@ -704,7 +704,6 @@ const PatientRegistration = () => {
                   className="input-field px-2 py-1.5 border-gray-300 focus:border-purple-500 focus:ring-purple-500"
                   required
                 >
-                  <option value="">Select Doctor</option>
                   {Array.isArray(doctors) && doctors.map((doctor) => (
                     <option key={doctor.id} value={doctor.id}>
                       {doctor.name} ({doctor.code})

@@ -86,35 +86,6 @@ interface Particular {
   created_at: string;
 }
 
-// Predefined list of departments
-// const DEPARTMENTS = [
-//   'General Medicine',
-//   'Cardiology',
-//   'Pediatrics',
-//   'Orthopedics',
-//   'Dermatology',
-//   'Neurology',
-//   'ENT',
-//   'Ophthalmology',
-//   'Dentistry',
-//   'OPD' // Added OPD as default
-// ]
-
-// Predefined list of particular items
-//   'Consultation',
-//   'Review',
-//   'Procedure',
-//   'physiotherapy',
-//   'Medicine',
-//   'Test',
-//   'X-Ray',
-//   'ECG',
-//   'Ultrasound',
-//   'Injection',
-//   'Dressing',
-//   'Other'
-// ]
-
 const OPBillEntry = () => {
   const navigate = useNavigate()
   const [currentTime] = useState(new Date())
@@ -140,6 +111,7 @@ const OPBillEntry = () => {
   
   const [particulars, setParticulars] = useState<Particular[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
+  const [isDataLoaded, setIsDataLoaded] = useState(false)
 
   const [patientFormData, setPatientFormData] = useState({
     name: '',
@@ -162,20 +134,8 @@ const OPBillEntry = () => {
     payment_mode: 'Cash'
   })
 
-  const [billItems, setBillItems] = useState<BillItem[]>([
-    {
-      particular: 'Consultation',
-      doctor: '',
-      doctor_id: 0,
-      department: 'OPD',
-      unit: 1,
-      rate: 0,
-      amount: 0,
-      discount_percent: 0,
-      discount_amount: 0,
-      total: 0
-    }
-  ])
+  // Initialize with empty array, will be populated after particulars load
+  const [billItems, setBillItems] = useState<BillItem[]>([])
 
   // Initialize bill number on component mount
   useEffect(() => {
@@ -186,35 +146,80 @@ const OPBillEntry = () => {
   }, [])
 
   useEffect(() => {
-    fetchDoctors()
-    fetchDepartments()
-    fetchParticulars()
+    fetchInitialData()
   }, [])
 
-  
-  
-    const fetchDepartments = async () => {
-      try {
-        const response = await axios.get('/settings/departments', {
-          params: { active_only: false }
-        })
-        setDepartments(response.data)
-      } catch (error) {
-        console.error('Error fetching departments:', error)
-        toast.error('Failed to load departments')
-      }
+  const fetchInitialData = async () => {
+    try {
+      await Promise.all([
+        fetchDoctors(),
+        fetchDepartments(),
+        fetchParticulars()
+      ])
+    } catch (error) {
+      toast.error('Failed to load initial data')
     }
-    const fetchParticulars = async () => {
-      try {
-        const response = await axios.get('/settings/particulars', {
-          params: { active_only: false }
-        })
-        setParticulars(response.data)
-      } catch (error) {
-        console.error('Error fetching particulars:', error)
-        toast.error('Failed to load particulars')
-      }
+  }
+  
+  const fetchDepartments = async () => {
+    try {
+      const response = await axios.get('/settings/departments', {
+        params: { active_only: false }
+      })
+      setDepartments(response.data)
+    } catch (error) {
+      console.error('Error fetching departments:', error)
+      toast.error('Failed to load departments')
     }
+  }
+  
+  const fetchParticulars = async () => {
+    try {
+      const response = await axios.get('/settings/particulars', {
+        params: { active_only: false }
+      })
+      setParticulars(response.data)
+      return response.data
+    } catch (error) {
+      console.error('Error fetching particulars:', error)
+      toast.error('Failed to load particulars')
+      return []
+    }
+  }
+
+  // Initialize bill items after doctors and particulars are loaded
+  useEffect(() => {
+    if (particulars.length > 0 && doctors.length > 0 && !isDataLoaded) {
+      initializeBillItems()
+      setIsDataLoaded(true)
+    }
+  }, [particulars, doctors])
+
+  const initializeBillItems = () => {
+    const defaultDoctorId = doctors[0]?.id || 0
+    const defaultDoctor = doctors.find(dr => dr.id === defaultDoctorId)
+    const defaultParticularId = particulars.length > 0 ? String(particulars[0].id) : ''
+    
+    setBillItems([
+      {
+        particular: defaultParticularId,
+        doctor: defaultDoctor?.booking_code || '',
+        doctor_id: defaultDoctorId,
+        department: defaultDoctor?.department || 'OPD',
+        unit: 1,
+        rate: 0,
+        amount: 0,
+        discount_percent: 0,
+        discount_amount: 0,
+        total: 0
+      }
+    ])
+    
+    // Also set default doctor in patient form
+    if (doctors.length > 0) {
+      setPatientFormData(prev => ({ ...prev, doctor_id: doctors[0].id }))
+    }
+  }
 
   // Update consultation item when patient's doctor changes - FIXED VERSION
   useEffect(() => {
@@ -245,23 +250,10 @@ const OPBillEntry = () => {
         department: doctor.department || 'OPD' // Default to OPD if no department
       }))
       setDoctors(doctorsWithDept)
-      if (doctorsWithDept.length > 0) {
-        setPatientFormData(prev => ({ ...prev, doctor_id: doctorsWithDept[0].id }))
-        // Update the consultation bill item with first doctor
-        const firstDoctor = doctorsWithDept[0];
-        setBillItems(prev => prev.map((item, index) =>
-          index === 0 && item.particular === 'Consultation'
-            ? {
-              ...item,
-              doctor: firstDoctor.booking_code,
-              doctor_id: firstDoctor.id,
-              department: firstDoctor.department
-            }
-            : item
-        ))
-      }
+      return doctorsWithDept
     } catch (error) {
       toast.error('Failed to load doctors')
+      return []
     }
   }
 
@@ -272,33 +264,33 @@ const OPBillEntry = () => {
     }
 
     setIsSearching(true)
-   try {
-  const response = await axios.get(`/patients/search/op/${encodeURIComponent(searchQuery)}`)
-  const opPatients = response.data
-  setPatients(opPatients)
-  setShowSearchResults(true)
-  
-  if (opPatients.length === 0) {
-    toast.success('No OP patients found matching your search')
-  } else {
-    toast.success(`Found ${opPatients.length} OP patients`)
-  }
-} catch (error) {
-  const axiosError = error as AxiosError
+    try {
+      const response = await axios.get(`/patients/search/op/${encodeURIComponent(searchQuery)}`)
+      const opPatients = response.data
+      setPatients(opPatients)
+      setShowSearchResults(true)
+      
+      if (opPatients.length === 0) {
+        toast.success('No OP patients found matching your search')
+      } else {
+        toast.success(`Found ${opPatients.length} OP patients`)
+      }
+    } catch (error) {
+      const axiosError = error as AxiosError
 
-  if (axiosError.response) {
-    toast.error(`OP search failed: ${axiosError.response.status}`)
-  } else if (axiosError.request) {
-    toast.error('Network error - unable to connect to server')
-  } else {
-    toast.error('OP search failed: ' + axiosError.message)
-  }
+      if (axiosError.response) {
+        toast.error(`OP search failed: ${axiosError.response.status}`)
+      } else if (axiosError.request) {
+        toast.error('Network error - unable to connect to server')
+      } else {
+        toast.error('OP search failed: ' + axiosError.message)
+      }
 
-  setPatients([])
-  setShowSearchResults(false)
-} finally {
-  setIsSearching(false)
-}
+      setPatients([])
+      setShowSearchResults(false)
+    } finally {
+      setIsSearching(false)
+    }
   }
 
   const handleSelectPatient = async (patient: Patient) => {
@@ -447,7 +439,7 @@ const OPBillEntry = () => {
     // If no items, keep default items
     setBillItems(mappedItems.length > 0 ? mappedItems : [
       {
-        particular: 'Consultation',
+        particular: particulars.length > 0 ? String(particulars[0].id) : '',
         doctor: doctors.find(dr => dr.id === patientFormData.doctor_id)?.booking_code ?? '',
         doctor_id: patientFormData.doctor_id,
         department: 'OPD',
@@ -485,12 +477,13 @@ const OPBillEntry = () => {
     // Reset to default consultation item
     const defaultDoctorId = selectedPatient?.doctor_id || patientFormData.doctor_id;
     const defaultDoctor = doctors.find(dr => dr.id === defaultDoctorId);
+    const defaultParticularId = particulars.length > 0 ? String(particulars[0].id) : '';
 
     setBillItems(prev => prev.map((item, index) =>
       index === 0
         ? {
           ...item,
-          particular: 'Consultation',
+          particular: defaultParticularId,
           doctor: defaultDoctor?.booking_code || '',
           doctor_id: defaultDoctorId || 0,
           department: defaultDoctor?.department || 'OPD',
@@ -502,7 +495,7 @@ const OPBillEntry = () => {
           total: 0
         }
         : {
-          particular: '',
+          particular: defaultParticularId,
           doctor: defaultDoctor?.booking_code || '',
           doctor_id: defaultDoctorId || 0,
           department: defaultDoctor?.department || 'OPD',
@@ -551,27 +544,35 @@ const OPBillEntry = () => {
     setBillItems(newItems)
   }
 
-const addBillItem = useCallback(() => {
-  // Get the main doctor from patient form or selected patient
-  const mainDoctorId = selectedPatient?.doctor_id || patientFormData.doctor_id;
-  const mainDoctor = doctors.find(dr => dr.id === mainDoctorId);
-  
-  // Add new item with default values
-  const newItem: BillItem = { 
-    particular: '', 
-    doctor: mainDoctor?.booking_code || '', 
-    doctor_id: mainDoctorId || 0, 
-    department: mainDoctor?.department || 'OPD', 
-    unit: 1, 
-    rate: 0, 
-    amount: 0, 
-    discount_percent: 0, 
-    discount_amount: 0, 
-    total: 0 
-  };
-  
-  setBillItems(prev => [...prev, newItem]);
-}, [selectedPatient, patientFormData.doctor_id, doctors])
+  const addBillItem = useCallback(() => {
+    if (particulars.length === 0) {
+      toast.error('Particulars not loaded yet')
+      return
+    }
+    
+    // Get the main doctor from patient form or selected patient
+    const mainDoctorId = selectedPatient?.doctor_id || patientFormData.doctor_id;
+    const mainDoctor = doctors.find(dr => dr.id === mainDoctorId);
+    
+    // Always use the first particular
+    const defaultParticularId = particulars.length > 0 ? String(particulars[0].id) : ''
+    
+    // Add new item with default values
+    const newItem: BillItem = { 
+      particular: defaultParticularId,
+      doctor: mainDoctor?.booking_code || '', 
+      doctor_id: mainDoctorId || 0, 
+      department: mainDoctor?.department || 'OPD', 
+      unit: 1, 
+      rate: 0, 
+      amount: 0, 
+      discount_percent: 0, 
+      discount_amount: 0, 
+      total: 0 
+    };
+    
+    setBillItems(prev => [...prev, newItem]);
+  }, [selectedPatient, patientFormData.doctor_id, doctors, particulars])
   
   const removeBillItem = (index: number) => {
     if (billItems.length > 1) {
@@ -589,6 +590,11 @@ const addBillItem = useCallback(() => {
   }
 
   const handlePrintBill = () => {
+    if (billItems.length === 0) {
+      toast.error('No bill items to print')
+      return
+    }
+    
     // Calculate totals
     const { totalAmount, totalDiscount, netAmount } = calculateTotals();
 
@@ -867,34 +873,35 @@ const addBillItem = useCallback(() => {
                   </thead>
                   <tbody>
                     ${billItems.map((bi, index) => {
-      const displayAmount = typeof bi.amount === 'number'
-        ? bi.amount.toFixed(2)
-        : typeof bi.amount === 'string'
-          ? (parseFloat(bi.amount) || 0).toFixed(2)
-          : '0.00';
+                      const particularName = particulars.find(p => String(p.id) === bi.particular)?.name || bi.particular
+                      const displayAmount = typeof bi.amount === 'number'
+                        ? bi.amount.toFixed(2)
+                        : typeof bi.amount === 'string'
+                          ? (parseFloat(bi.amount) || 0).toFixed(2)
+                          : '0.00';
 
-      const displayRate = typeof bi.rate === 'number'
-        ? bi.rate.toFixed(2)
-        : typeof bi.rate === 'string'
-          ? (parseFloat(bi.rate) || 0).toFixed(2)
-          : '0.00';
+                      const displayRate = typeof bi.rate === 'number'
+                        ? bi.rate.toFixed(2)
+                        : typeof bi.rate === 'string'
+                          ? (parseFloat(bi.rate) || 0).toFixed(2)
+                          : '0.00';
 
-      const displayDiscount = typeof bi.discount_amount === 'number'
-        ? bi.discount_amount.toFixed(2)
-        : typeof bi.discount_amount === 'string'
-          ? (parseFloat(bi.discount_amount) || 0).toFixed(2)
-          : '0.00';
+                      const displayDiscount = typeof bi.discount_amount === 'number'
+                        ? bi.discount_amount.toFixed(2)
+                        : typeof bi.discount_amount === 'string'
+                          ? (parseFloat(bi.discount_amount) || 0).toFixed(2)
+                          : '0.00';
 
-      const displayTotal = typeof bi.total === 'number'
-        ? bi.total.toFixed(2)
-        : typeof bi.total === 'string'
-          ? (parseFloat(bi.total) || 0).toFixed(2)
-          : '0.00';
+                      const displayTotal = typeof bi.total === 'number'
+                        ? bi.total.toFixed(2)
+                        : typeof bi.total === 'string'
+                          ? (parseFloat(bi.total) || 0).toFixed(2)
+                          : '0.00';
 
-      return `
+                      return `
                         <tr>
                           <td>${index + 1}</td>
-                          <td>${bi.particular || ''}</td>
+                          <td>${particularName}</td>
                           <td>${bi.doctor || ''}</td>
                           <td>${bi.department || ''}</td>
                           <td>${bi.unit || 1}</td>
@@ -905,7 +912,7 @@ const addBillItem = useCallback(() => {
                           <td class="amount-column">${displayTotal}</td>
                         </tr>
                       `;
-    }).join('')}
+                    }).join('')}
                   </tbody>
                 </table>
               </div>
@@ -1050,6 +1057,16 @@ const addBillItem = useCallback(() => {
   };
 
   const handleSaveBill = async () => {
+    // Validate bill items have valid particulars
+    const hasInvalidParticulars = billItems.some(item => 
+      !item.particular || item.particular === '' || item.particular === 'undefined'
+    );
+    
+    if (hasInvalidParticulars) {
+      toast.error('Please ensure all bill items have valid particulars selected');
+      return;
+    }
+
     // If selected patient exists, update it, otherwise create new
     if (!selectedPatient && (!patientFormData.name || !patientFormData.age || !patientFormData.gender ||
       !patientFormData.complaint || !patientFormData.phone || !patientFormData.doctor_id)) {
@@ -1121,58 +1138,73 @@ const addBillItem = useCallback(() => {
   }
 
   const handleResetForms = () => {
-  // Generate new bill number when resetting forms
-  billNumberRef.current = generateBillNumber()
-  
-  setSelectedPatient(null)
-  setPreviousBills([])
-  setCurrentBillIndex(-1)
-  setShowPreviousBills(false)
-  
-  setPatientFormData({
-    name: '',
-    age: '',
-    gender: 'Male',
-    complaint: '',
-    house: '',
-    street: '',
-    place: '',
-    phone: '',
-    email: '',
-    doctor_id: doctors[0]?.id || 0,
-    referred_by: ''
-  })
-  
-  setBillFormData({
-    bill_type: 'Cash',
-    category: 'General',
-    payment_mode: 'Cash'
-  })
-  
-  // Reset bill items with default consultation
-  const defaultDoctorId = doctors[0]?.id || 0;
-  const defaultDoctor = doctors.find(dr => dr.id === defaultDoctorId);
-  
-  setBillItems([
-    { 
-      particular: 'Consultation', 
-      doctor: defaultDoctor?.booking_code || '', 
-      doctor_id: defaultDoctorId, 
-      department: defaultDoctor?.department || 'OPD', 
-      unit: 1, 
-      rate: 0, 
-      amount: 0, 
-      discount_percent: 0, 
-      discount_amount: 0, 
-      total: 0 
-    }
-  ])
-  
-  setSearchQuery('')
-  setShowSearchResults(false)
-}
+    // Generate new bill number when resetting forms
+    billNumberRef.current = generateBillNumber()
+    
+    setSelectedPatient(null)
+    setPreviousBills([])
+    setCurrentBillIndex(-1)
+    setShowPreviousBills(false)
+    
+    setPatientFormData({
+      name: '',
+      age: '',
+      gender: 'Male',
+      complaint: '',
+      house: '',
+      street: '',
+      place: '',
+      phone: '',
+      email: '',
+      doctor_id: doctors[0]?.id || 0,
+      referred_by: ''
+    })
+    
+    setBillFormData({
+      bill_type: 'Cash',
+      category: 'General',
+      payment_mode: 'Cash'
+    })
+    
+    // Reset bill items with default consultation
+    const defaultDoctorId = doctors[0]?.id || 0;
+    const defaultDoctor = doctors.find(dr => dr.id === defaultDoctorId);
+    
+    // Use the first particular from particulars array
+    const defaultParticularId = particulars.length > 0 ? String(particulars[0].id) : ''
+    
+    setBillItems([
+      { 
+        particular: defaultParticularId,
+        doctor: defaultDoctor?.booking_code || '', 
+        doctor_id: defaultDoctorId, 
+        department: defaultDoctor?.department || 'OPD', 
+        unit: 1, 
+        rate: 0, 
+        amount: 0, 
+        discount_percent: 0, 
+        discount_amount: 0, 
+        total: 0 
+      }
+    ])
+    
+    setSearchQuery('')
+    setShowSearchResults(false)
+  }
 
   const { totalAmount, totalDiscount, netAmount } = calculateTotals()
+
+  // Show loading state while data is being fetched
+  if (!isDataLoaded || billItems.length === 0) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="animate-spin mx-auto mb-4" size={32} />
+          <p className="text-gray-600">Loading bill entry form...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -1593,9 +1625,7 @@ const addBillItem = useCallback(() => {
                     onChange={(e) => setPatientFormData({ ...patientFormData, doctor_id: parseInt(e.target.value) })}
                     className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
                   >
-                    {/* <option value="">Select Doctor</option> */}
                     {doctors.map(doctor => (
-                      // <option key={doctor.id} value={doctor.id}>Dr. {doctor.name}</option>
                       <option key={doctor.id} value={doctor.id}>{doctor.name.replace('Dr.', '').trim()}</option>
                     ))}
                   </select>
@@ -1715,7 +1745,6 @@ const addBillItem = useCallback(() => {
                   onChange={(e) => handleBillItemChange(index, 'particular', e.target.value)}
                   className="w-full px-1 py-0.5 border border-gray-300 rounded text-xs appearance-none pr-6"
                 >
-                  {/* <option value="">Select Particular</option> */}
                   {particulars.map((particular, idx) => (
                     <option key={idx} value={particular.id}>
                       {particular.name}

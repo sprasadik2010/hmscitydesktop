@@ -7,13 +7,13 @@ import { format } from 'date-fns'
 import type { AxiosError } from 'axios'
 
 interface BillItem {
-  particular: string
-  department: string
-  doctor_id: number
+  particular: string  // This stores the particular ID (as string)
+  department: string  // This stores the department ID (as string)
   amount: number
   discount_percent: number
   discount_amount: number
   total: number
+  doctor_id?: number
 }
 
 interface BillPurtcularsnDept {
@@ -80,6 +80,18 @@ interface BillDetails {
   }>
 }
 
+interface Department {
+  id: number;
+  name: string;
+  created_at: string;
+}
+
+interface Particular {
+  id: number;
+  name: string;
+  created_at: string;
+}
+
 const IPBillEntry = () => {
   const navigate = useNavigate()
   const [currentTime] = useState(new Date())
@@ -101,41 +113,10 @@ const IPBillEntry = () => {
   const [isLoadingBills, setIsLoadingBills] = useState(false)
   const [showPreviousBills, setShowPreviousBills] = useState(false)
   const [isLoadingBillDetails, setIsLoadingBillDetails] = useState(false)
+  const [particulars, setParticulars] = useState<Particular[]>([])
+  const [departments, setDepartments] = useState<Department[]>([])
+  const [billParticularsnDepts, setBillParticularsnDepts] = useState<BillPurtcularsnDept[]>([])
 
-  const DEPARTMENTS = [
-    'General Medicine',
-    'Cardiology',
-    'Pediatrics',
-    'Orthopedics',
-    'Dermatology',
-    'Neurology',
-    'ENT',
-    'Ophthalmology',
-    'Dentistry',
-    'General',
-    'Hospital',
-    'OPD'
-  ]
-
-  // Add these constants near the top of your component
-  const PARTICULAR_ITEMS = [
-    'Room Charges',
-    'Doctor Fees',
-    'Water Bill',
-    'Professional Fee',
-    'Consultation',
-    'Review',
-    'Procedure',
-    'physiotherapy',
-    'Medicine',
-    'Test',
-    'X-Ray',
-    'ECG',
-    'Ultrasound',
-    'Injection',
-    'Dressing',
-    'Other'
-  ]
   // Patient Form Data
   const [patientFormData, setPatientFormData] = useState({
     name: '',
@@ -167,39 +148,107 @@ const IPBillEntry = () => {
     she_education_cess: 0
   })
 
-  const [billParticularsnDepts] = useState<BillPurtcularsnDept[]>([
-    { particular: 'Room Charges', department: 'General' },
-    { particular: 'Doctor Fees', department: 'General' },
-    { particular: 'Water Bill', department: 'General' },
-    { particular: 'Professional Fee', department: 'Hospital' },
-  ]);
-
-  const [billItems, setBillItems] = useState<BillItem[]>([]);
+  const [billItems, setBillItems] = useState<BillItem[]>([])
 
   // Initialize bill number on component mount
   useEffect(() => {
-    // Generate initial bill number only once
     if (!billNumberRef.current) {
       billNumberRef.current = generateBillNumber()
     }
-
-    // Initialize bill items
-    const doctorId = patientFormData.doctor_id
-    const initialBillItems = billParticularsnDepts.map((PnD) => ({
-      particular: PnD.particular,
-      department: PnD.department,
-      doctor_id: doctorId,
-      amount: 0,
-      discount_percent: 0,
-      discount_amount: 0,
-      total: 0
-    }));
-    setBillItems(initialBillItems);
-  }, [billParticularsnDepts]);
-
-  useEffect(() => {
-    fetchDoctors()
+    
+    fetchInitialData()
   }, [])
+
+  // Initialize bill items when billParticularsnDepts, particulars, and departments are set
+  useEffect(() => {
+    if (billParticularsnDepts.length > 0 && billItems.length === 0 && particulars.length > 0 && departments.length > 0) {
+      const initialBillItems = billParticularsnDepts.map((PnD) => {
+        // Find IDs for the default particular and department
+        const particular = particulars.find(p => p.name === PnD.particular)
+        const department = departments.find(d => d.name === PnD.department)
+        
+        return {
+          particular: particular ? particular.id.toString() : '',
+          department: department ? department.id.toString() : '',
+          amount: 0,
+          discount_percent: 0,
+          discount_amount: 0,
+          total: 0,
+          doctor_id: doctors.length > 0 ? doctors[0].id : 0
+        }
+      })
+      setBillItems(initialBillItems)
+    }
+  }, [billParticularsnDepts, particulars, departments, doctors])
+
+  const fetchInitialData = async () => {
+    setIsLoading(true)
+    try {
+      // Fetch doctors first
+      await fetchDoctors()
+      
+      // Then fetch departments and particulars
+      await Promise.all([
+        fetchDepartments(),
+        fetchParticulars()
+      ])
+    } catch (error) {
+      toast.error('Failed to load initial data')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const fetchDepartments = async () => {
+    try {
+      const response = await axios.get('/settings/departments', {
+        params: { active_only: false }
+      })
+      setDepartments(response.data)
+    } catch (error) {
+      console.error('Error fetching departments:', error)
+      toast.error('Failed to load departments')
+    }
+  }
+
+  const fetchParticulars = async () => {
+    try {
+      const response = await axios.get('/settings/particulars', {
+        params: { active_only: false }
+      })
+      const particularsData = response.data
+      setParticulars(particularsData)
+      
+      // Initialize billParticularsnDepts if we have particulars
+      if (particularsData.length > 0) {
+        const initialBillParticulars = particularsData.map((particular: Particular) => ({
+          particular: particular.name,
+          department: 'General' // Default department name
+        }))
+        setBillParticularsnDepts(initialBillParticulars)
+      }
+      
+      return particularsData
+    } catch (error) {
+      console.error('Error fetching particulars:', error)
+      toast.error('Failed to load particulars')
+      return []
+    }
+  }
+
+  // Helper function to get particular name from ID
+  const getParticularName = (id: string): string => {
+    if (!id) return 'Select Particular'
+    const particular = particulars.find(p => p.id.toString() === id)
+    return particular ? particular.name : 'N/A'
+  }
+
+  // Helper function to get department name from ID
+  const getDepartmentName = (id: string): string => {
+    if (!id) return 'Select Department'
+    const department = departments.find(d => d.id.toString() === id)
+    return department ? department.name : 'N/A'
+  }
 
   const fetchDoctors = async () => {
     try {
@@ -208,11 +257,13 @@ const IPBillEntry = () => {
       if (response.data.length > 0) {
         const doctorId = response.data[0].id
         setPatientFormData(prev => ({ ...prev, doctor_id: doctorId }))
-        // Update bill items with the new doctor ID
-        setBillItems(prev => prev.map(item => ({
-          ...item,
-          doctor_id: doctorId
-        })))
+        // Update bill items with the new doctor ID if they exist
+        if (billItems.length > 0) {
+          setBillItems(prev => prev.map(item => ({
+            ...item,
+            doctor_id: doctorId
+          })))
+        }
       }
     } catch (error) {
       toast.error('Failed to load doctors')
@@ -279,7 +330,7 @@ const IPBillEntry = () => {
     setBillItems(prev => prev.map(item => ({
       ...item,
       doctor_id: patient.doctor_id
-    })));
+    })))
 
     // Load previous bills for this patient
     await fetchPreviousBills(patient.id)
@@ -340,7 +391,7 @@ const IPBillEntry = () => {
       setCurrentBillIndex(index)
 
       // Populate form with loaded bill data
-      populateFormWithBill(billDetails)
+      await populateFormWithBill(billDetails)
 
       toast.success(`Bill ${bill.bill_number} loaded successfully`)
     } catch (error: any) {
@@ -352,7 +403,7 @@ const IPBillEntry = () => {
     }
   }
 
-  const populateFormWithBill = (billDetails: BillDetails) => {
+  const populateFormWithBill = async (billDetails: BillDetails) => {
     const { bill, items } = billDetails
 
     // Update bill form data
@@ -382,27 +433,57 @@ const IPBillEntry = () => {
     // Update bill items
     if (items.length > 0) {
       const doctorId = selectedPatient?.doctor_id || patientFormData.doctor_id
-      const mappedItems: BillItem[] = items.map(item => ({
-        particular: item.particular,
-        department: item.department,
-        doctor_id: doctorId,
-        amount: item.amount,
-        discount_percent: item.discount_percent,
-        discount_amount: item.discount_amount,
-        total: item.total
+      const mappedItems: BillItem[] = await Promise.all(items.map(async (item) => {
+        // Find IDs for particular and department
+        let particularId = ''
+        let departmentId = ''
+        
+        // Find particular ID by name
+        const particular = particulars.find(p => p.name === item.particular)
+        if (particular) {
+          particularId = particular.id.toString()
+        } else {
+          // If particular not found, try to get it from the first available
+          particularId = particulars.length > 0 ? particulars[0].id.toString() : ''
+        }
+        
+        // Find department ID by name
+        const department = departments.find(d => d.name === item.department)
+        if (department) {
+          departmentId = department.id.toString()
+        } else {
+          // If department not found, try to get it from the first available
+          departmentId = departments.length > 0 ? departments[0].id.toString() : ''
+        }
+        
+        return {
+          particular: particularId,
+          department: departmentId,
+          doctor_id: doctorId,
+          amount: item.amount,
+          discount_percent: item.discount_percent,
+          discount_amount: item.discount_amount,
+          total: item.total
+        }
       }))
       setBillItems(mappedItems)
     } else {
       // If no items, use default items from billParticularsnDepts
       const doctorId = selectedPatient?.doctor_id || patientFormData.doctor_id
-      const defaultItems = billParticularsnDepts.map(PnD => ({
-        particular: PnD.particular,
-        department: PnD.department,
-        doctor_id: doctorId,
-        amount: 0,
-        discount_percent: 0,
-        discount_amount: 0,
-        total: 0
+      const defaultItems = await Promise.all(billParticularsnDepts.map(async (PnD) => {
+        // Find IDs for particular and department
+        const particular = particulars.find(p => p.name === PnD.particular)
+        const department = departments.find(d => d.name === PnD.department)
+        
+        return {
+          particular: particular ? particular.id.toString() : '',
+          department: department ? department.id.toString() : '',
+          doctor_id: doctorId,
+          amount: 0,
+          discount_percent: 0,
+          discount_amount: 0,
+          total: 0
+        }
       }))
       setBillItems(defaultItems)
     }
@@ -439,15 +520,21 @@ const IPBillEntry = () => {
 
     // Reset bill items using billParticularsnDepts with current patient's doctor
     const doctorId = selectedPatient?.doctor_id || patientFormData.doctor_id
-    const defaultItems = billParticularsnDepts.map(PnD => ({
-      particular: PnD.particular,
-      department: PnD.department,
-      doctor_id: doctorId,
-      amount: 0,
-      discount_percent: 0,
-      discount_amount: 0,
-      total: 0
-    }))
+    const defaultItems = billParticularsnDepts.map(PnD => {
+      // Find IDs for particular and department
+      const particular = particulars.find(p => p.name === PnD.particular)
+      const department = departments.find(d => d.name === PnD.department)
+      
+      return {
+        particular: particular ? particular.id.toString() : '',
+        department: department ? department.id.toString() : '',
+        doctor_id: doctorId,
+        amount: 0,
+        discount_percent: 0,
+        discount_amount: 0,
+        total: 0
+      }
+    })
     setBillItems(defaultItems)
 
     toast('Ready to create new bill', {
@@ -478,10 +565,17 @@ const IPBillEntry = () => {
   }
 
   const addBillItem = () => {
-    const doctorId = selectedPatient?.doctor_id || patientFormData.doctor_id
     setBillItems([
       ...billItems,
-      { particular: '', department: 'General', doctor_id: doctorId, amount: 0, discount_percent: 0, discount_amount: 0, total: 0 }
+      { 
+        particular: particulars.length > 0 ? particulars[0].id.toString() : '', 
+        department: departments.length > 0 ? departments[0].id.toString() : '', 
+        amount: 0, 
+        discount_percent: 0, 
+        discount_amount: 0, 
+        total: 0,
+        doctor_id: selectedPatient?.doctor_id || patientFormData.doctor_id
+      }
     ])
   }
 
@@ -734,17 +828,19 @@ const IPBillEntry = () => {
                   </thead>
                   <tbody>
                     ${billItems.map((bi, index) => {
+      const particularName = getParticularName(bi.particular)
+      const departmentName = getDepartmentName(bi.department)
       const displayAmount = typeof bi.amount === 'number'
         ? bi.amount.toFixed(2)
         : typeof bi.amount === 'string'
           ? (parseFloat(bi.amount) || 0).toFixed(2)
-          : '0.00';
+          : '0.00'
 
       return `
                         <tr>
                           <td>${index + 1}</td>
-                          <td>${bi.particular || ''}</td>
-                          <td>${bi.department || ''}</td>
+                          <td>${particularName}</td>
+                          <td>${departmentName}</td>
                           <td class="amount-column">${displayAmount}</td>
                         </tr>
                       `;
@@ -921,8 +1017,10 @@ const IPBillEntry = () => {
         admission_time: format(currentTime, 'HH:mm:ss'),
         doctor_id: patientFormData.doctor_id,
         items: billItems.map(item => ({
-          particular: item.particular,
-          department: item.department,
+          particular: item.particular,  // Send ID to backend
+          department: item.department,  // Send ID to backend
+          // particular: getParticularName(item.particular),  // Also send name for reference
+          // department: getDepartmentName(item.department),  // Also send name for reference
           amount: item.amount,
           discount_percent: item.discount_percent
         }))
@@ -985,15 +1083,21 @@ const IPBillEntry = () => {
 
     // Reset bill items using billParticularsnDepts
     const doctorId = doctors[0]?.id || 0
-    const defaultItems = billParticularsnDepts.map(PnD => ({
-      particular: PnD.particular,
-      department: PnD.department,
-      doctor_id: doctorId,
-      amount: 0,
-      discount_percent: 0,
-      discount_amount: 0,
-      total: 0
-    }))
+    const defaultItems = billParticularsnDepts.map(PnD => {
+      // Find IDs for particular and department
+      const particular = particulars.find(p => p.name === PnD.particular)
+      const department = departments.find(d => d.name === PnD.department)
+      
+      return {
+        particular: particular ? particular.id.toString() : '',
+        department: department ? department.id.toString() : '',
+        doctor_id: doctorId,
+        amount: 0,
+        discount_percent: 0,
+        discount_amount: 0,
+        total: 0
+      }
+    })
     setBillItems(defaultItems)
 
     setSearchQuery('')
@@ -1423,7 +1527,6 @@ const IPBillEntry = () => {
                     onChange={(e) => setPatientFormData({ ...patientFormData, doctor_id: parseInt(e.target.value) })}
                     className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
                   >
-                    <option value="">Select</option>
                     {doctors.map(doctor => (
                       <option key={doctor.id} value={doctor.id}>{doctor.name}</option>
                     ))}
@@ -1584,35 +1687,41 @@ const IPBillEntry = () => {
                       <td className="px-2 py-1.5 border">
                         <div className="relative">
                           <select
-                            value={item.particular}
+                            value={item.particular}  // This stores the ID
                             onChange={(e) => handleBillItemChange(index, 'particular', e.target.value)}
                             className="w-full px-1 py-0.5 border border-gray-300 rounded text-xs appearance-none pr-6"
                           >
                             <option value="">Select Particular</option>
-                            {PARTICULAR_ITEMS.map((particular, idx) => (
-                              <option key={idx} value={particular}>
-                                {particular}
+                            {particulars.map((particular) => (
+                              <option key={particular.id} value={particular.id.toString()}>
+                                {particular.name}
                               </option>
                             ))}
                           </select>
                           <ChevronDown className="absolute right-1 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" size={12} />
+                          <div className="absolute left-1 top-1/2 transform -translate-y-1/2 text-xs text-gray-500 pointer-events-none">
+                            {getParticularName(item.particular)}
+                          </div>
                         </div>
                       </td>
                       <td className="px-2 py-1.5 border">
                         <div className="relative">
                           <select
-                            value={item.department}
+                            value={item.department}  // This stores the ID
                             onChange={(e) => handleBillItemChange(index, 'department', e.target.value)}
                             className="w-full px-1 py-0.5 border border-gray-300 rounded text-xs appearance-none pr-6"
                           >
                             <option value="">Select Department</option>
-                            {DEPARTMENTS.map((department, idx) => (
-                              <option key={idx} value={department}>
-                                {department}
+                            {departments.map((department) => (
+                              <option key={department.id} value={department.id.toString()}>
+                                {department.name}
                               </option>
                             ))}
                           </select>
                           <ChevronDown className="absolute right-1 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" size={12} />
+                          <div className="absolute left-1 top-1/2 transform -translate-y-1/2 text-xs text-gray-500 pointer-events-none">
+                            {getDepartmentName(item.department)}
+                          </div>
                         </div>
                       </td>
                       <td className="px-2 py-1.5 border">

@@ -86,8 +86,7 @@ async def get_patient_list(
 
 @router.get("/particulars-report")
 async def get_particulars_report(
-    # particular_name: str = Query(..., description="Particular name to search for (e.g., 'X-RAY', 'ECG', 'BLOOD TEST')"),
-    particular_id: int = Query(..., description="Particular ID')"),
+    particular_id: int = Query(..., description="Particular ID"),
     start_date: date = Query(default_factory=lambda: date.today() - timedelta(days=30)),
     end_date: date = Query(default_factory=date.today),
     include_op: bool = Query(True, description="Include OP bills"),
@@ -98,7 +97,6 @@ async def get_particulars_report(
 ):
     """
     Generate report for specific medical particulars (e.g., X-RAY, ECG, Blood Test).
-    Search is case-insensitive.
     """
     
     if not include_op and not include_ip:
@@ -116,6 +114,47 @@ async def get_particulars_report(
         "summary_by_doctor": []
     }
     
+    # Helper function to create bill item detail
+    def create_bill_item_detail(item, bill, patient, bill_type):
+        if bill_type == "OP":
+            detail = {
+                "bill_type": bill_type,
+                "bill_id": bill.id if bill else None,
+                "bill_number": bill.bill_number if bill else None,
+                "bill_date": bill.bill_date if bill else None,
+                "patient_name": patient.name if patient else None,
+                "patient_id": bill.patient_id if bill else None,
+                "patient_age": patient.age if patient else None,
+                "patient_gender": patient.gender if patient else None,
+                "particular": item.particular,
+                "unit": item.unit,
+                "rate": float(item.rate or 0),
+                "amount": float(item.amount or 0),
+                "total": float(item.total or 0),
+                "doctor_name": item.doctor,
+                "doctor_id": item.doctor_id,
+                "department": item.department,
+            }
+        else:  # IP
+            detail = {
+                "bill_type": bill_type,
+                "bill_id": bill.id if bill else None,
+                "bill_number": bill.bill_number if bill else None,
+                "bill_date": bill.bill_date if bill else None,
+                "patient_name": patient.name if patient else None,
+                "patient_id": bill.patient_id if bill else None,
+                "patient_age": patient.age if patient else None,
+                "patient_gender": patient.gender if patient else None,
+                "particular": item.particular,
+                "amount": float(item.amount or 0),
+                "total": float(item.total or 0),
+                "doctor_name": bill.doctor.name if bill and bill.doctor else None,
+                "doctor_id": bill.doctor_id if bill else None,
+                "department": item.department,
+            }
+        
+        return detail
+    
     # ========== OP BILL ITEMS ==========
     if include_op:
         op_query = db.query(OPBillItem, OPBill, Patient).join(
@@ -130,25 +169,13 @@ async def get_particulars_report(
             func.date(OPBill.bill_date) <= end_date
         )
         
-        # Remove joinedload since we're already joining
         op_items = op_query.order_by(OPBill.bill_date.desc()).all()
         
         for item, bill, patient in op_items:
-            op_detail = {
-                "bill_type": "OP",
-                "bill_number": bill.bill_number if bill else None,
-                "bill_date": bill.bill_date if bill else None,
-                "patient_name": patient.name if patient else None,
-                "patient_id": bill.patient_id if bill else None,
-                "patient_age": patient.age if patient else None,
-                "patient_gender": patient.gender if patient else None,
-                "doctor_name": item.doctor,
-                "doctor_id": item.doctor_id,
-                "particular": item.particular,
-                # ... rest of fields ...
-            }
+            op_detail = create_bill_item_detail(item, bill, patient, "OP")
             results["op_details"].append(op_detail)
-            # ... rest of processing ...
+            results["total_count"] += 1
+            results["total_amount"] += op_detail["total"]
     
     # ========== IP BILL ITEMS ==========
     if include_ip:
@@ -164,23 +191,13 @@ async def get_particulars_report(
             func.date(IPBill.bill_date) <= end_date
         )
         
-        # Remove joinedload since we're already joining
         ip_items = ip_query.order_by(IPBill.bill_date.desc()).all()
         
         for item, bill, patient in ip_items:
-            ip_detail = {
-                "bill_type": "IP",
-                "bill_number": bill.bill_number if bill else None,
-                "bill_date": bill.bill_date if bill else None,
-                "patient_name": patient.name if patient else None,
-                "patient_id": bill.patient_id if bill else None,
-                "patient_age": patient.age if patient else None,
-                "patient_gender": patient.gender if patient else None,
-                "doctor_name": bill.doctor.name if bill and bill.doctor else None,
-                "doctor_id": bill.doctor_id if bill else None,
-                # ... rest of fields ...
-            }
+            ip_detail = create_bill_item_detail(item, bill, patient, "IP")
             results["ip_details"].append(ip_detail)
+            results["total_count"] += 1
+            results["total_amount"] += ip_detail["total"]
     
     # ========== SUMMARY BY DATE ==========
     # OP summary by date
@@ -209,17 +226,27 @@ async def get_particulars_report(
     
     # Combine summaries
     summary_dict = {}
-    for date_str, count, amount in op_summary:
-        if date_str not in summary_dict:
-            summary_dict[date_str] = {"date": date_str, "op_count": 0, "ip_count": 0, "total_amount": 0.0}
-        summary_dict[date_str]["op_count"] = count
-        summary_dict[date_str]["total_amount"] += (amount or 0)
+    for date_val, count, amount in op_summary:
+        if date_val not in summary_dict:
+            summary_dict[date_val] = {
+                "date": date_val, 
+                "op_count": 0, 
+                "ip_count": 0, 
+                "total_amount": 0.0
+            }
+        summary_dict[date_val]["op_count"] = count or 0
+        summary_dict[date_val]["total_amount"] += float(amount or 0)
     
-    for date_str, count, amount in ip_summary:
-        if date_str not in summary_dict:
-            summary_dict[date_str] = {"date": date_str, "op_count": 0, "ip_count": 0, "total_amount": 0.0}
-        summary_dict[date_str]["ip_count"] = count
-        summary_dict[date_str]["total_amount"] += (amount or 0)
+    for date_val, count, amount in ip_summary:
+        if date_val not in summary_dict:
+            summary_dict[date_val] = {
+                "date": date_val, 
+                "op_count": 0, 
+                "ip_count": 0, 
+                "total_amount": 0.0
+            }
+        summary_dict[date_val]["ip_count"] = count or 0
+        summary_dict[date_val]["total_amount"] += float(amount or 0)
     
     results["summary_by_date"] = sorted(summary_dict.values(), key=lambda x: x["date"], reverse=True)
     
@@ -238,7 +265,11 @@ async def get_particulars_report(
     ).group_by(Doctor.name).all()
     
     results["summary_by_doctor"] = [
-        {"doctor_name": doctor, "count": count, "total_amount": float(amount or 0)}
+        {
+            "doctor_name": doctor, 
+            "count": count, 
+            "total_amount": float(amount or 0)
+        }
         for doctor, count, amount in op_doctor_summary
     ]
     
@@ -246,25 +277,10 @@ async def get_particulars_report(
     if group_by_patient:
         patient_summary = {}
         
-        # OP items grouped by patient
-        for item in results["op_details"]:
-            patient_id = item["patient_id"]
-            if patient_id not in patient_summary:
-                patient_summary[patient_id] = {
-                    "patient_id": patient_id,
-                    "patient_name": item["patient_name"],
-                    "patient_age": item["patient_age"],
-                    "patient_gender": item["patient_gender"],
-                    "total_count": 0,
-                    "total_amount": 0.0,
-                    "details": []
-                }
-            patient_summary[patient_id]["total_count"] += 1
-            patient_summary[patient_id]["total_amount"] += item["total"]
-            patient_summary[patient_id]["details"].append(item)
+        # Combine all details
+        all_details = results["op_details"] + results["ip_details"]
         
-        # IP items grouped by patient
-        for item in results["ip_details"]:
+        for item in all_details:
             patient_id = item["patient_id"]
             if patient_id not in patient_summary:
                 patient_summary[patient_id] = {
