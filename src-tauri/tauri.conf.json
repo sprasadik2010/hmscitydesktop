@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "CityNH",
+  "productName": "${TAURI_APP_NAME}",
   "version": "1.0.0",
-  "identifier": "com.citynh.hms",
+  "identifier": "${TAURI_APP_IDENTIFIER}",
   "build": {
     "beforeDevCommand": "cd ../frontend && npm run dev",
     "beforeBuildCommand": "cd ../frontend && npm run build",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "CityNH HMS",
+        "title": "${TAURI_WINDOW_TITLE}",
         "width": 1200,
         "height": 800,
         "resizable": true,

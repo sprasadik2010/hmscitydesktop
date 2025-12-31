@@ -3,6 +3,7 @@ import axios from 'axios'
 import { Download, Filter, Calendar, Printer, FileText, BarChart3, Users, CreditCard, TrendingUp, Building, ArrowUpRight, TestTube } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format, isValid, parseISO } from 'date-fns'
+import { appConfig } from '../config/appConfig';
 
 interface Particular {
   id: number;
@@ -645,10 +646,10 @@ const Reports = () => {
     <div class="print-container">
       <!-- Report Header -->
       <div class="report-header">
-        <h1>CITY NURSING HOME</h1>
+        <h1>${appConfig.hospitalName}</h1>
+        <div class="subtitle">${appConfig.address}</div>
+        <div class="subtitle">Phone: ${appConfig.phone}</div>
         <h2>${title}</h2>
-        <div class="subtitle">NORTH KOTACHERY</div>
-        <div class="subtitle">Phone: 202842, 202574, 2218153</div>
         <div class="report-period">
           Generated for period: ${startDate ? new Date(startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A'} - ${endDate ? new Date(endDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A'}
         </div>
