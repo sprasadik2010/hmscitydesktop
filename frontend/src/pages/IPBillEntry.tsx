@@ -89,6 +89,9 @@ interface Department {
 interface Particular {
   id: number;
   name: string;
+  opdefault: boolean;
+  ipdefault: boolean;
+  sortorder: number;
   created_at: string;
 }
 
@@ -161,25 +164,43 @@ const IPBillEntry = () => {
 
   // Initialize bill items when billParticularsnDepts, particulars, and departments are set
   useEffect(() => {
-    if (billParticularsnDepts.length > 0 && billItems.length === 0 && particulars.length > 0 && departments.length > 0) {
-      const initialBillItems = billParticularsnDepts.map((PnD) => {
-        // Find IDs for the default particular and department
-        const particular = particulars.find(p => p.name === PnD.particular)
-        const department = departments.find(d => d.name === PnD.department)
-        
-        return {
-          particular: particular ? particular.id.toString() : '',
-          department: department ? department.id.toString() : '',
-          amount: 0,
-          discount_percent: 0,
-          discount_amount: 0,
-          total: 0,
-          doctor_id: doctors.length > 0 ? doctors[0].id : 0
-        }
-      })
-      setBillItems(initialBillItems)
-    }
-  }, [billParticularsnDepts, particulars, departments, doctors])
+  if (billParticularsnDepts.length > 0 && billItems.length === 0 && particulars.length > 0 && departments.length > 0) {
+    // Filter to only get IP default particulars
+    const ipDefaultParticulars = particulars.filter(p => p.ipdefault === true);
+    
+    // If no IP defaults found, use the first particular as fallback
+    const defaultParticulars = ipDefaultParticulars.length > 0 
+      ? ipDefaultParticulars 
+      : [particulars[0]];
+    
+    // Sort by sortorder if available
+    const sortedParticulars = [...defaultParticulars].sort((a, b) => 
+      (a.sortorder || 0) - (b.sortorder || 0)
+    );
+
+    // Create initial bill items
+    const initialBillItems = sortedParticulars.map((particular) => {
+      // Find department for this particular (if you have a mapping)
+      // Or use the default department from billParticularsnDepts
+      const defaultDept = billParticularsnDepts.find(pnd => pnd.particular === particular.name);
+      const department = departments.find(d => d.name === (defaultDept?.department || 'General'));
+      
+      return {
+        particular: particular.id.toString(),
+        department: department ? department.id.toString() : '',
+        amount: 0,
+        discount_percent: 0,
+        discount_amount: 0,
+        total: 0,
+        // For IP bills, doctor_id should be 0 or not included at all
+        // Check your IPBillItemCreate schema - if it has doctor_id with default 0
+        doctor_id: 0 // or remove this field if not needed
+      }
+    })
+    
+    setBillItems(initialBillItems)
+  }
+}, [billParticularsnDepts, billItems.length, particulars, departments])
 
   const fetchInitialData = async () => {
     setIsLoading(true)

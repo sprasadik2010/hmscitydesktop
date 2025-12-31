@@ -83,6 +83,9 @@ interface Department {
 interface Particular {
   id: number;
   name: string;
+  opdefault: boolean;
+  ipdefault: boolean;
+  sortorder: number;
   created_at: string;
 }
 
@@ -198,23 +201,42 @@ const OPBillEntry = () => {
   const initializeBillItems = () => {
     const defaultDoctorId = doctors[0]?.id || 0
     const defaultDoctor = doctors.find(dr => dr.id === defaultDoctorId)
-    const defaultParticularId = particulars.length > 0 ? String(particulars[0].id) : ''
-    
-    setBillItems([
-      {
-        particular: defaultParticularId,
-        doctor: defaultDoctor?.booking_code || '',
-        doctor_id: defaultDoctorId,
-        department: defaultDoctor?.department || 'OPD',
-        unit: 1,
-        rate: 0,
-        amount: 0,
-        discount_percent: 0,
-        discount_amount: 0,
-        total: 0
-      }
-    ])
-    
+    // const defaultParticularId = particulars.length > 0 ? String(particulars[0].id) : ''
+    // ADDED BY SIVAPRASAD I K ================
+    const initialBillItems = particulars
+  .filter(par => par.opdefault === true) // Only get OP default particulars
+  .sort((a, b) => a.sortorder - b.sortorder) // Sort by sortorder
+  .map(par => ({
+    particular: par.id.toString(), // Use particular ID
+    doctor: defaultDoctor?.booking_code || '',
+    doctor_id: defaultDoctorId,
+    department: defaultDoctor?.department || 'OPD',
+    unit: 1,
+    rate: 0,
+    amount: 0,
+    discount_percent: 0,
+    discount_amount: 0,
+    total: 0
+  }));
+
+// If no opdefault particulars found, add at least one item
+if (initialBillItems.length === 0 && particulars.length > 0) {
+  initialBillItems.push({
+    particular: particulars[0].id.toString(),
+    doctor: defaultDoctor?.booking_code || '',
+    doctor_id: defaultDoctorId,
+    department: defaultDoctor?.department || 'OPD',
+    unit: 1,
+    rate: 0,
+    amount: 0,
+    discount_percent: 0,
+    discount_amount: 0,
+    total: 0
+  });
+}
+
+setBillItems(initialBillItems);
+    //=================================
     // Also set default doctor in patient form
     if (doctors.length > 0) {
       setPatientFormData(prev => ({ ...prev, doctor_id: doctors[0].id }))

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Plus, Trash2, Building, Tag, X, RefreshCw } from 'lucide-react';
+import { Settings, Plus, Trash2, Building, Tag, X, RefreshCw, Check } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
@@ -14,6 +14,9 @@ interface Department {
 interface Particular {
   id: number;
   name: string;
+  opdefault: boolean;
+  ipdefault: boolean;
+  sortorder: number;
   created_at: string;
 }
 
@@ -28,7 +31,9 @@ const SettingsPage: React.FC = () => {
   const [showDeptForm, setShowDeptForm] = useState(false);
   
   const [newParticularName, setNewParticularName] = useState('');
-  // REMOVED: const [selectedDeptId, setSelectedDeptId] = useState<number>(0);
+  const [newParticularOpDefault, setNewParticularOpDefault] = useState(false);
+  const [newParticularIpDefault, setNewParticularIpDefault] = useState(false);
+  const [newParticularSortOrder, setNewParticularSortOrder] = useState<number>(-1);
   const [showParticularForm, setShowParticularForm] = useState(false);
   
   const [stats, setStats] = useState({
@@ -103,21 +108,20 @@ const SettingsPage: React.FC = () => {
       return;
     }
 
-    // REMOVED: Department selection validation
-    // if (selectedDeptId === 0) {
-    //   toast.error('Please select a department');
-    //   return;
-    // }
-
     try {
       const response = await axios.post(`${API_BASE_URL}/settings/particulars`, {
-        name: newParticularName
-        // REMOVED: department_id: selectedDeptId
+        name: newParticularName,
+        opdefault: newParticularOpDefault,
+        ipdefault: newParticularIpDefault,
+        sortorder: newParticularSortOrder
       });
       
       setParticulars([...particulars, response.data]);
+      // Reset form
       setNewParticularName('');
-      // REMOVED: setSelectedDeptId(0);
+      setNewParticularOpDefault(false);
+      setNewParticularIpDefault(false);
+      setNewParticularSortOrder(-1);
       setShowParticularForm(false);
       
       toast.success('Particular added');
@@ -139,6 +143,17 @@ const SettingsPage: React.FC = () => {
     } catch (error: any) {
       toast.error(error.response?.data?.detail || 'Failed to delete particular');
     }
+  };
+
+  const getDefaultBadge = (particular: Particular) => {
+    const badges = [];
+    if (particular.opdefault) {
+      badges.push(<span key="op" className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">OP Default</span>);
+    }
+    if (particular.ipdefault) {
+      badges.push(<span key="ip" className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">IP Default</span>);
+    }
+    return badges;
   };
 
   if (isLoading) {
@@ -286,10 +301,17 @@ const SettingsPage: React.FC = () => {
               <div className="space-y-3">
                 {particulars.map((part) => (
                   <div key={part.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
-                    <div>
-                      <div className="font-medium text-gray-900">{part.name}</div>
+                    <div className="flex-1">
+                      <div className="font-medium text-gray-900 mb-1">{part.name}</div>
+                      <div className="flex items-center gap-2 mb-1">
+                        {getDefaultBadge(part)}
+                        {part.sortorder > -1 && (
+                          <span className="px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded">
+                            Sort Order: {part.sortorder}
+                          </span>
+                        )}
+                      </div>
                       <div className="text-sm text-gray-500">
-                        {/* REMOVED: Department display */}
                         Created: {new Date(part.created_at).toLocaleDateString()}
                       </div>
                     </div>
@@ -360,9 +382,9 @@ const SettingsPage: React.FC = () => {
                   </button>
                 </div>
               </div>
-              <div className="p-6">
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Particular Name</label>
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Particular Name *</label>
                   <input
                     type="text"
                     value={newParticularName}
@@ -371,10 +393,65 @@ const SettingsPage: React.FC = () => {
                     placeholder="Enter particular name"
                   />
                 </div>
-                {/* REMOVED: Department selection */}
-                <div className="flex justify-end gap-3">
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-3">
+                    <label className="block text-sm font-medium text-gray-700">Default Settings</label>
+                    <div className="space-y-2">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <div className="relative">
+                          <input
+                            type="checkbox"
+                            checked={newParticularOpDefault}
+                            onChange={(e) => setNewParticularOpDefault(e.target.checked)}
+                            className="sr-only"
+                          />
+                          <div className={`w-5 h-5 border rounded ${newParticularOpDefault ? 'bg-blue-600 border-blue-600' : 'border-gray-300'}`}>
+                            {newParticularOpDefault && <Check className="w-4 h-4 text-white absolute top-0.5 left-0.5" />}
+                          </div>
+                        </div>
+                        <span className="text-sm text-gray-700">OP Default</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <div className="relative">
+                          <input
+                            type="checkbox"
+                            checked={newParticularIpDefault}
+                            onChange={(e) => setNewParticularIpDefault(e.target.checked)}
+                            className="sr-only"
+                          />
+                          <div className={`w-5 h-5 border rounded ${newParticularIpDefault ? 'bg-green-600 border-green-600' : 'border-gray-300'}`}>
+                            {newParticularIpDefault && <Check className="w-4 h-4 text-white absolute top-0.5 left-0.5" />}
+                          </div>
+                        </div>
+                        <span className="text-sm text-gray-700">IP Default</span>
+                      </label>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Sort Order</label>
+                    <input
+                      type="number"
+                      value={newParticularSortOrder}
+                      onChange={(e) => setNewParticularSortOrder(Number(e.target.value))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      placeholder="-1 for default"
+                      min="-1"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Lower numbers appear first. Use -1 for default sorting.</p>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-4">
                   <button
-                    onClick={() => setShowParticularForm(false)}
+                    onClick={() => {
+                      setShowParticularForm(false);
+                      setNewParticularName('');
+                      setNewParticularOpDefault(false);
+                      setNewParticularIpDefault(false);
+                      setNewParticularSortOrder(-1);
+                    }}
                     className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
                   >
                     Cancel
@@ -383,7 +460,7 @@ const SettingsPage: React.FC = () => {
                     onClick={handleAddParticular}
                     className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
                   >
-                    Save
+                    Save Particular
                   </button>
                 </div>
               </div>
