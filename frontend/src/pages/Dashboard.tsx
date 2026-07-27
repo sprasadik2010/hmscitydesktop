@@ -121,9 +121,9 @@ const Dashboard = () => {
           <div>
             <h1 className="text-3xl font-bold text-white flex items-center">
               <Hospital className="mr-3" size={32} />
-              Hospital Management System
+              Patient Management System
             </h1>
-            <p className="text-blue-100 mt-2 text-lg">Welcome to HMS Lite - Professional Healthcare Management</p>
+            <p className="text-blue-100 mt-2 text-lg">Welcome to PMS Lite - Professional Patient Management</p>
           </div>
           <div className="hidden md:block">
             <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 border border-white/20">
@@ -245,11 +245,11 @@ const Dashboard = () => {
             <HeartPulse className="text-red-500 mr-3" size={24} />
             <div>
               <h3 className="font-bold text-gray-900">Healthcare First</h3>
-              <p className="text-gray-600 text-sm">Your commitment to quality healthcare management</p>
+              <p className="text-gray-600 text-sm">Your commitment to quality patient management</p>
             </div>
           </div>
           <div className="text-sm text-gray-500">
-            HMS Lite v1.0 • {new Date().getFullYear()}
+            PMS Lite v1.0 • {new Date().getFullYear()}
           </div>
         </div>
       </div>

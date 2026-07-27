@@ -5,7 +5,7 @@ from typing import List, Optional
 from datetime import datetime
 import random
 
-from database import get_db
+from ...database import get_db
 from .auth import get_current_user
 from ..models import Patient, Doctor
 from ..schemas import PatientCreate, PatientResponse
@@ -123,6 +123,22 @@ async def get_patients(
 #         response.doctor_name = patient.doctor.name
     
 #     return response
+
+@router.get("/{patient_id}", response_model=PatientResponse)
+async def get_patient(
+    patient_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    patient = db.query(Patient).filter(Patient.id == patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+    
+    response = PatientResponse.from_orm(patient)
+    if patient.doctor:
+        response.doctor_name = patient.doctor.name
+    
+    return response
 
 @router.get("/search/op/{searchtext}")
 def search_op_by_searchtext(

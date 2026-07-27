@@ -174,4 +174,20 @@ class Particular(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(200), nullable=False)
+    opdefault = Column(Boolean, default=False)
+    ipdefault = Column(Boolean, default=False)
+    sortorder = Column(Integer, default=-1)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class HospitalSettings(Base):
+    __tablename__ = "hospital_settings"
+    
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)
+    address = Column(String, nullable=False)
+    phone = Column(String, nullable=False)
+    email = Column(String)
+    website = Column(String)
+    logo = Column(String)  # optional for logo upload
+    footer_note = Column(String)
+    updated_at = Column(DateTime, default=datetime.utcnow)

@@ -22,7 +22,7 @@ fn get_app_data_dir() -> Option<PathBuf> {
     // Try to get AppData/Local directory
     dirs::data_local_dir()
         .map(|mut path| {
-            path.push("CityNH");
+            path.push("PMSLite");
             path.push("logs");
             path
         })

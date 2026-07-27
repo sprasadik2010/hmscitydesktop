@@ -146,8 +146,8 @@ const Layout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
                   <Building className="text-white" size={32} />
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold text-white">HMS Pro</h1>
-                  <p className="text-blue-200 text-sm">Hospital Management System</p>
+                  <h1 className="text-2xl font-bold text-white">PMS Pro</h1>
+                  <p className="text-blue-200 text-sm">Patient Management System</p>
                 </div>
               </div>
               <button

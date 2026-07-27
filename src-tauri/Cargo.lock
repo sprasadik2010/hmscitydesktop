@@ -315,16 +315,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "citynh"
-version = "1.0.0"
-dependencies = [
- "chrono",
- "dirs 5.0.1",
- "tauri",
- "tauri-build",
-]
-
-[[package]]
 name = "combine"
 version = "4.6.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2333,6 +2323,16 @@ dependencies = [
  "quick-xml",
  "serde",
  "time",
+]
+
+[[package]]
+name = "pmslite"
+version = "1.0.0"
+dependencies = [
+ "chrono",
+ "dirs 5.0.1",
+ "tauri",
+ "tauri-build",
 ]
 
 [[package]]

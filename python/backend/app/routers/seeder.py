@@ -488,7 +488,7 @@ async def insert_all_dummy_data():
         
         db.bulk_save_objects(doctors_objects)
         db.commit()
-        print("10 doctors inserted successfully")
+        print("✅ 10 doctors inserted successfully")
         
         # Step 3: Get doctor IDs for patient assignment
         doctor_ids = [d.id for d in db.query(Doctor.id).all()]
@@ -507,7 +507,7 @@ async def insert_all_dummy_data():
         
         db.bulk_save_objects(patients_objects)
         db.commit()
-        print("18 patients inserted successfully")
+        print("✅ 18 patients inserted successfully")
         
         # Step 5: Get patient and doctor IDs for bills
         all_patients = db.query(Patient).all()
@@ -555,7 +555,7 @@ async def insert_all_dummy_data():
                 )
                 db.add(item)
         
-        print("25 OP bills inserted")
+        print("✅ 25 OP bills inserted")
         
         # Step 7: Insert IP Bills
         print("Inserting IP bills...")
@@ -591,13 +591,13 @@ async def insert_all_dummy_data():
                     # doctor=doctor.booking_code,
                     department=random.choice(DEPARTMENTS),
                     amount=random.choice([500, 1000, 1500, 2000, 3000]),
-                    discount_percent=random.choice([0, 5, 10])#,
-                    # doctor_id=doctor.id
+                    discount_percent=random.choice([0, 5, 10]),
+                    doctor_id=doctor.id
                 )
                 db.add(item)
         
         db.commit()
-        print("25 IP bills inserted")
+        print("✅ 25 IP bills inserted")
         
         # Final summary
         total_doctors = db.query(Doctor).count()

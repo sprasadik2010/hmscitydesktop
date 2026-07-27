@@ -3,7 +3,7 @@ from datetime import date, timedelta
 from fastapi import APIRouter, HTTPException
 from sqlalchemy.exc import SQLAlchemyError
 
-from database import SessionLocal
+from ...database import SessionLocal
 from ..models.models import Doctor, Patient, OPBill, OPBillItem, IPBill, IPBillItem
 
 router = APIRouter(prefix="/seed", tags=["Data Seeder"])

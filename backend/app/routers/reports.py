@@ -4,7 +4,7 @@ from typing import List, Optional
 from datetime import datetime, date, timedelta
 from sqlalchemy import func, or_, cast, Integer
 
-from database import get_db
+from ...database import get_db
 from .auth import get_current_user
 from ..models import Patient, OPBill, IPBill, OPBillItem, IPBillItem, Doctor
 

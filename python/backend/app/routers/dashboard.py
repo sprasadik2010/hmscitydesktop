@@ -42,7 +42,7 @@ async def get_dashboard_stats(
     ).scalar() or 0
     
     total_revenue_today = op_revenue + ip_revenue
-    
+
     return DashboardStats(
         total_patients_today=total_patients_today,
         total_op_bills_today=total_op_bills_today,

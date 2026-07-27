@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime, date
 
-from database import get_db
+from ...database import get_db
 from .auth import get_current_user
 from ..models import Patient, OPBill, IPBill
 from ..schemas import DashboardStats

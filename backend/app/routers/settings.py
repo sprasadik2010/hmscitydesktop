@@ -1,13 +1,31 @@
-# routers/settings.py - Modified version with independent Particular
+# routers/settings.py - Modified version with independent Particular and Hospital Settings
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime
+from pydantic import BaseModel
 
-from database import get_db
+from ...database import get_db
 from .auth import get_current_user
-from ..models import Base, Department, Particular
-from ..schemas import DepartmentCreate, DepartmentResponse, ParticularCreate, ParticularResponse #, ParticularUpdate
+from ..models import Department, Particular, HospitalSettings
+from ..schemas import DepartmentCreate, DepartmentResponse, ParticularCreate, ParticularResponse
+
+# Pydantic schemas for HospitalSettings
+class HospitalSettingsBase(BaseModel):
+    name: str
+    address: str
+    phone: str
+    email: Optional[str] = None
+    website: Optional[str] = None
+    logo: Optional[str] = None
+    footer_note: Optional[str] = None
+
+class HospitalSettingsResponse(HospitalSettingsBase):
+    id: int
+    updated_at: Optional[datetime] = None
+    
+    class Config:
+        from_attributes = True
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -119,35 +137,6 @@ async def create_particular(
     
     return db_particular
 
-# @router.put("/particulars/{particular_id}", response_model=ParticularResponse)
-# async def update_particular(
-#     particular_id: int,
-#     particular: ParticularUpdate,
-#     db: Session = Depends(get_db),
-#     current_user = Depends(get_current_user)
-# ):
-#     """
-#     Update a particular
-#     """
-#     db_particular = db.query(Particular).filter(Particular.id == particular_id).first()
-#     if not db_particular:
-#         raise HTTPException(status_code=404, detail="Particular not found")
-    
-#     # Check if name is being changed and if new name already exists
-#     if particular.name and particular.name != db_particular.name:
-#         existing = db.query(Particular).filter(Particular.name == particular.name).first()
-#         if existing:
-#             raise HTTPException(status_code=400, detail="Particular name already exists")
-    
-#     # Update fields if provided
-#     update_data = particular.model_dump(exclude_unset=True)
-#     for field, value in update_data.items():
-#         setattr(db_particular, field, value)
-    
-#     db.commit()
-#     db.refresh(db_particular)
-#     return db_particular
-
 @router.delete("/particulars/{particular_id}")
 async def delete_particular(
     particular_id: int,
@@ -165,6 +154,52 @@ async def delete_particular(
     db.commit()
     return {"message": "Particular deleted successfully"}
 
+# Hospital Settings endpoints
+@router.get("/hospital", response_model=HospitalSettingsResponse)
+async def get_hospital_settings(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """
+    Get hospital settings
+    """
+    settings = db.query(HospitalSettings).first()
+    if not settings:
+        # Create default settings if none exist
+        settings = HospitalSettings(
+            name="",
+            address="",
+            phone="",
+            footer_note="Thank you for your visit"
+        )
+        db.add(settings)
+        db.commit()
+        db.refresh(settings)
+    return settings
+
+@router.put("/hospital", response_model=HospitalSettingsResponse)
+async def update_hospital_settings(
+    settings: HospitalSettingsBase,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """
+    Update hospital settings
+    """
+    db_settings = db.query(HospitalSettings).first()
+    if not db_settings:
+        # Create new settings if none exist
+        db_settings = HospitalSettings(**settings.model_dump())
+        db.add(db_settings)
+    else:
+        # Update existing settings
+        for key, value in settings.model_dump().items():
+            setattr(db_settings, key, value)
+    
+    db.commit()
+    db.refresh(db_settings)
+    return db_settings
+
 @router.get("/stats")
 async def get_settings_stats(
     db: Session = Depends(get_db),
@@ -177,10 +212,13 @@ async def get_settings_stats(
     total_particulars = db.query(Particular).count()
     total_op_defaults = db.query(Particular).filter(Particular.opdefault == True).count()
     total_ip_defaults = db.query(Particular).filter(Particular.ipdefault == True).count()
+    hospital_settings = db.query(HospitalSettings).first()
     
     return {
         "total_departments": total_departments,
         "total_particulars": total_particulars,
         "total_op_defaults": total_op_defaults,
-        "total_ip_defaults": total_ip_defaults
+        "total_ip_defaults": total_ip_defaults,
+        "hospital_configured": hospital_settings is not None,
+        "hospital_name": hospital_settings.name if hospital_settings else None
     }

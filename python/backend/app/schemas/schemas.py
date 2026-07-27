@@ -245,9 +245,18 @@ class DepartmentResponse(DepartmentBase):
 # Particular Schemas (Minimal)
 class ParticularBase(BaseModel):
     name: str
+    opdefault: Optional[bool] = False
+    ipdefault: Optional[bool] = False
+    sortorder: Optional[int] = -1
 
 class ParticularCreate(ParticularBase):
     pass
+    
+class ParticularUpdate(BaseModel):
+    name: Optional[str] = None
+    opdefault: Optional[bool] = None
+    ipdefault: Optional[bool] = None
+    sortorder: Optional[int] = None
 
 class ParticularResponse(ParticularBase):
     id: int

@@ -1,16 +1,16 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from app.models.models import Base
+from .app.models.models import Base
 import os
 
 APP_DATA_DIR = os.path.join(
     os.environ["LOCALAPPDATA"],
-    "HMSLite"
+    "PMSLite"
 )
 
 os.makedirs(APP_DATA_DIR, exist_ok=True)
 
-db_path = os.path.join(APP_DATA_DIR, "hms_lite.db")
+db_path = os.path.join(APP_DATA_DIR, "pms_lite.db")
 
 SQLALCHEMY_DATABASE_URL = f"sqlite:///{db_path}"
 

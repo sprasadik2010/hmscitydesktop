@@ -133,3 +133,16 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
 @router.get("/me")
 async def read_users_me(current_user: User = Depends(get_current_user)):
     return current_user
+
+# NEW ENDPOINT: Check if any users exist in the system
+@router.get("/check-users", response_model=dict)
+async def check_users(db: Session = Depends(get_db)):
+    """
+    Check if any users exist in the system
+    Returns: {"has_users": bool, "total_users": int}
+    """
+    user_count = db.query(User).count()
+    return {
+        "has_users": user_count > 0,
+        "total_users": user_count
+    }

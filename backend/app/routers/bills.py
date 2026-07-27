@@ -5,7 +5,7 @@ from typing import List
 from datetime import datetime
 import random
 
-from database import get_db
+from ...database import get_db
 from .auth import get_current_user
 from ..models import OPBill, OPBillItem, IPBill, IPBillItem, Patient, Doctor
 from ..schemas import OPBillCreate, IPBillCreate

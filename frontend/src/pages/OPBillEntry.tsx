@@ -1,10 +1,21 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
-import { X, Search, Building, CalendarClock, User, Loader2, Users, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react'
+import { X, Search, Building, CalendarClock, User, Loader2, Users, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ArrowLeft, ArrowRight, ListFilter } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
 import type { AxiosError } from 'axios'
+
+const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://127.0.0.1:8000';
+
+interface HospitalConfig {
+  name: string;
+  address: string;
+  phone: string;
+  email?: string;
+  website?: string;
+  footer_note?: string;
+}
 
 interface BillItem {
   particular: string
@@ -89,6 +100,18 @@ interface Particular {
   created_at: string;
 }
 
+interface BillNavigation {
+  id: number
+  bill_number: string
+  bill_date: string
+  patient_name: string
+  patient_number: string
+  total_amount: number
+  net_amount: number
+  category: string
+  doctor_name: string
+}
+
 const OPBillEntry = () => {
   const navigate = useNavigate()
   const [currentTime] = useState(new Date())
@@ -104,6 +127,17 @@ const OPBillEntry = () => {
   const [patients, setPatients] = useState<Patient[]>([])
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
 
+  // Hospital settings
+  const [hospitalConfig, setHospitalConfig] = useState<HospitalConfig>({
+    name: '',
+    address: '',
+    phone: '',
+    email: '',
+    website: '',
+    footer_note: 'Thank you for your visit'
+  })
+  const [isLoadingHospital, setIsLoadingHospital] = useState(true)
+
   // Previous bills states
   const [previousBills, setPreviousBills] = useState<PreviousBill[]>([])
   const [currentBillIndex, setCurrentBillIndex] = useState<number>(-1)
@@ -111,7 +145,11 @@ const OPBillEntry = () => {
   const [showPreviousBills, setShowPreviousBills] = useState(false)
   const [isLoadingBillDetails, setIsLoadingBillDetails] = useState(false)
 
-  
+  // All bills navigation
+  const [allBills, setAllBills] = useState<BillNavigation[]>([])
+  const [isLoadingAllBills, setIsLoadingAllBills] = useState(false)
+  const [currentAllBillIndex, setCurrentAllBillIndex] = useState<number>(-1)
+
   const [particulars, setParticulars] = useState<Particular[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
   const [isDataLoaded, setIsDataLoaded] = useState(false)
@@ -140,9 +178,13 @@ const OPBillEntry = () => {
   // Initialize with empty array, will be populated after particulars load
   const [billItems, setBillItems] = useState<BillItem[]>([])
 
+  // Fetch hospital settings on mount
+  useEffect(() => {
+    fetchHospitalSettings()
+  }, [])
+
   // Initialize bill number on component mount
   useEffect(() => {
-    // Generate initial bill number only once
     if (!billNumberRef.current) {
       billNumberRef.current = generateBillNumber()
     }
@@ -151,6 +193,18 @@ const OPBillEntry = () => {
   useEffect(() => {
     fetchInitialData()
   }, [])
+
+  const fetchHospitalSettings = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/settings/hospital`)
+      setHospitalConfig(response.data)
+    } catch (error) {
+      console.error('Failed to load hospital settings, using defaults')
+      // Keep default values
+    } finally {
+      setIsLoadingHospital(false)
+    }
+  }
 
   const fetchInitialData = async () => {
     try {
@@ -163,10 +217,10 @@ const OPBillEntry = () => {
       toast.error('Failed to load initial data')
     }
   }
-  
+
   const fetchDepartments = async () => {
     try {
-      const response = await axios.get('/settings/departments', {
+      const response = await axios.get(`${API_BASE_URL}/settings/departments`, {
         params: { active_only: false }
       })
       setDepartments(response.data)
@@ -175,10 +229,10 @@ const OPBillEntry = () => {
       toast.error('Failed to load departments')
     }
   }
-  
+
   const fetchParticulars = async () => {
     try {
-      const response = await axios.get('/settings/particulars', {
+      const response = await axios.get(`${API_BASE_URL}/settings/particulars`, {
         params: { active_only: false }
       })
       setParticulars(response.data)
@@ -201,54 +255,49 @@ const OPBillEntry = () => {
   const initializeBillItems = () => {
     const defaultDoctorId = doctors[0]?.id || 0
     const defaultDoctor = doctors.find(dr => dr.id === defaultDoctorId)
-    // const defaultParticularId = particulars.length > 0 ? String(particulars[0].id) : ''
-    // ADDED BY SIVAPRASAD I K ================
+
     const initialBillItems = particulars
-  .filter(par => par.opdefault === true) // Only get OP default particulars
-  .sort((a, b) => a.sortorder - b.sortorder) // Sort by sortorder
-  .map(par => ({
-    particular: par.id.toString(), // Use particular ID
-    doctor: defaultDoctor?.booking_code || '',
-    doctor_id: defaultDoctorId,
-    department: defaultDoctor?.department || 'OPD',
-    unit: 1,
-    rate: 0,
-    amount: 0,
-    discount_percent: 0,
-    discount_amount: 0,
-    total: 0
-  }));
+      .filter(par => par.opdefault === true)
+      .sort((a, b) => a.sortorder - b.sortorder)
+      .map(par => ({
+        particular: par.id.toString(),
+        doctor: defaultDoctor?.booking_code || '',
+        doctor_id: defaultDoctorId,
+        department: defaultDoctor?.department || 'OPD',
+        unit: 1,
+        rate: 0,
+        amount: 0,
+        discount_percent: 0,
+        discount_amount: 0,
+        total: 0
+      }))
 
-// If no opdefault particulars found, add at least one item
-if (initialBillItems.length === 0 && particulars.length > 0) {
-  initialBillItems.push({
-    particular: particulars[0].id.toString(),
-    doctor: defaultDoctor?.booking_code || '',
-    doctor_id: defaultDoctorId,
-    department: defaultDoctor?.department || 'OPD',
-    unit: 1,
-    rate: 0,
-    amount: 0,
-    discount_percent: 0,
-    discount_amount: 0,
-    total: 0
-  });
-}
+    if (initialBillItems.length === 0 && particulars.length > 0) {
+      initialBillItems.push({
+        particular: particulars[0].id.toString(),
+        doctor: defaultDoctor?.booking_code || '',
+        doctor_id: defaultDoctorId,
+        department: defaultDoctor?.department || 'OPD',
+        unit: 1,
+        rate: 0,
+        amount: 0,
+        discount_percent: 0,
+        discount_amount: 0,
+        total: 0
+      })
+    }
 
-setBillItems(initialBillItems);
-    //=================================
-    // Also set default doctor in patient form
+    setBillItems(initialBillItems)
+
     if (doctors.length > 0) {
       setPatientFormData(prev => ({ ...prev, doctor_id: doctors[0].id }))
     }
   }
 
-  // Update consultation item when patient's doctor changes - FIXED VERSION
   useEffect(() => {
     if (patientFormData.doctor_id > 0 && billItems.length > 0 && doctors.length > 0) {
       const doctor = doctors.find(dr => dr.id === patientFormData.doctor_id);
       if (doctor && billItems[0].particular === 'Consultation') {
-        // Only update if the doctor_id is different
         if (billItems[0].doctor_id !== patientFormData.doctor_id) {
           const updatedItems = [...billItems];
           updatedItems[0] = {
@@ -261,15 +310,14 @@ setBillItems(initialBillItems);
         }
       }
     }
-  }, [patientFormData.doctor_id, doctors]) // Removed billItems from dependencies
+  }, [patientFormData.doctor_id, doctors]);
 
   const fetchDoctors = async () => {
     try {
-      const response = await axios.get('/doctors')
-      // Add department to doctors if not present (mock data for demo)
+      const response = await axios.get(`${API_BASE_URL}/doctors`)
       const doctorsWithDept = response.data.map((doctor: Doctor) => ({
         ...doctor,
-        department: doctor.department || 'OPD' // Default to OPD if no department
+        department: doctor.department || 'OPD'
       }))
       setDoctors(doctorsWithDept)
       return doctorsWithDept
@@ -287,11 +335,11 @@ setBillItems(initialBillItems);
 
     setIsSearching(true)
     try {
-      const response = await axios.get(`/patients/search/op/${encodeURIComponent(searchQuery)}`)
+      const response = await axios.get(`${API_BASE_URL}/patients/search/op/${encodeURIComponent(searchQuery)}`)
       const opPatients = response.data
       setPatients(opPatients)
       setShowSearchResults(true)
-      
+
       if (opPatients.length === 0) {
         toast.success('No OP patients found matching your search')
       } else {
@@ -318,7 +366,6 @@ setBillItems(initialBillItems);
   const handleSelectPatient = async (patient: Patient) => {
     setSelectedPatient(patient)
 
-    // Populate patient form
     setPatientFormData({
       name: patient.name,
       age: patient.age,
@@ -333,7 +380,6 @@ setBillItems(initialBillItems);
       referred_by: patient.referred_by || ''
     })
 
-    // Update consultation bill item with patient's doctor
     if (patient.doctor_id > 0 && doctors.length > 0) {
       const doctor = doctors.find(dr => dr.id === patient.doctor_id);
       if (doctor) {
@@ -350,12 +396,10 @@ setBillItems(initialBillItems);
       }
     }
 
-    // Reset previous bills navigation
     setPreviousBills([])
     setCurrentBillIndex(-1)
     setShowPreviousBills(false)
 
-    // Load previous bills for this patient
     await fetchPreviousBills(patient.id)
 
     setShowSearchResults(false)
@@ -366,8 +410,7 @@ setBillItems(initialBillItems);
   const fetchPreviousBills = async (patientId: number) => {
     setIsLoadingBills(true)
     try {
-      const response = await axios.get(`/bills/op/${patientId}`)
-      // Sort bills by date (newest first)
+      const response = await axios.get(`${API_BASE_URL}/bills/op/${patientId}`)
       const sortedBills = response.data.sort((a: any, b: any) =>
         new Date(b.bill_date).getTime() - new Date(a.bill_date).getTime()
       )
@@ -375,7 +418,6 @@ setBillItems(initialBillItems);
 
       if (sortedBills.length > 0) {
         setShowPreviousBills(true)
-        // Don't load any bill by default - start with blank form
         setCurrentBillIndex(-1)
         toast(`Found ${sortedBills.length} previous bill(s) for this patient`, {
           icon: 'ℹ️',
@@ -384,9 +426,33 @@ setBillItems(initialBillItems);
       }
     } catch (error) {
       console.error('Failed to load previous bills:', error)
-      // Don't show error toast if there are no bills
     } finally {
       setIsLoadingBills(false)
+    }
+  }
+
+  const fetchAllBills = async (limit: number = 100) => {
+    setIsLoadingAllBills(true)
+    try {
+      const response = await axios.get(`${API_BASE_URL}/bills/op/all`, {
+        params: { limit, offset: 0 }
+      })
+      const sortedBills = response.data.sort((a: any, b: any) =>
+        new Date(b.bill_date).getTime() - new Date(a.bill_date).getTime()
+      )
+      setAllBills(sortedBills)
+
+      if (sortedBills.length > 0) {
+        toast.success(`Loaded ${sortedBills.length} recent bills`)
+      }
+
+      return sortedBills
+    } catch (error) {
+      console.error('Error fetching all bills:', error)
+      toast.error('Failed to load all bills')
+      return []
+    } finally {
+      setIsLoadingAllBills(false)
     }
   }
 
@@ -395,7 +461,6 @@ setBillItems(initialBillItems);
 
     const bill = previousBills[index]
 
-    // Show confirmation before loading bill
     const confirmLoad = window.confirm(
       `Load bill ${bill.bill_number} from ${format(new Date(bill.bill_date), 'dd/MM/yyyy')}?\n` +
       `This will replace your current bill items.`
@@ -406,14 +471,38 @@ setBillItems(initialBillItems);
     try {
       setIsLoadingBillDetails(true)
 
-      // Fetch complete bill details with items using your API
-      const response = await axios.get(`/bills/op/details/${bill.id}`)
+      const response = await axios.get(`${API_BASE_URL}/bills/op/details/${bill.id}`)
       const billDetails: BillDetails = response.data
 
-      // Update current bill index
       setCurrentBillIndex(index)
+      setCurrentAllBillIndex(-1)
 
-      // Populate form with loaded bill data
+      billNumberRef.current = bill.bill_number
+
+      // Also fetch patient details to update the form
+      try {
+        const patientResponse = await axios.get(`${API_BASE_URL}/patients/${billDetails.bill.patient_id}`)
+        const patientData = patientResponse.data
+
+        setSelectedPatient(patientData)
+        setPatientFormData({
+          name: patientData.name,
+          age: patientData.age,
+          gender: patientData.gender,
+          complaint: patientData.complaint,
+          house: patientData.house,
+          street: patientData.street,
+          place: patientData.place,
+          phone: patientData.phone,
+          email: patientData.email || '',
+          doctor_id: patientData.doctor_id,
+          referred_by: patientData.referred_by || ''
+        })
+      } catch (error) {
+        console.error('Failed to load patient details:', error)
+        // Keep existing patient if we can't load new one
+      }
+
       populateFormWithBill(billDetails)
 
       toast.success(`Bill ${bill.bill_number} loaded successfully`)
@@ -421,6 +510,114 @@ setBillItems(initialBillItems);
       console.error('Error loading bill details:', error)
       toast.error('Failed to load bill details')
       setCurrentBillIndex(-1)
+    } finally {
+      setIsLoadingBillDetails(false)
+    }
+  }
+
+  const handleLoadBillFromAll = async (index: number) => {
+    if (index < 0 || index >= allBills.length) return
+
+    const bill = allBills[index]
+
+    const confirmLoad = window.confirm(
+      `Load bill ${bill.bill_number} from ${format(new Date(bill.bill_date), 'dd/MM/yyyy')}?\n` +
+      `Patient: ${bill.patient_name}\n` +
+      `This will replace your current bill items.`
+    )
+
+    if (!confirmLoad) return
+
+    try {
+      setIsLoadingBillDetails(true)
+
+      // First, fetch bill details to get patient_id
+      const billResponse = await axios.get(`${API_BASE_URL}/bills/op/details/${bill.id}`)
+      const billDetails: BillDetails = billResponse.data
+
+      // Update states
+      setCurrentAllBillIndex(index)
+      setCurrentBillIndex(-1)
+      billNumberRef.current = bill.bill_number
+
+      // Now fetch patient details using patient_id from the bill
+      try {
+        const patientResponse = await axios.get(`${API_BASE_URL}/patients/${billDetails.bill.patient_id}`)
+        const patientData = patientResponse.data
+
+        // Set the patient data
+        setSelectedPatient(patientData)
+
+        // Update patient form with loaded patient data
+        setPatientFormData({
+          name: patientData.name,
+          age: patientData.age,
+          gender: patientData.gender,
+          complaint: patientData.complaint,
+          house: patientData.house,
+          street: patientData.street,
+          place: patientData.place,
+          phone: patientData.phone,
+          email: patientData.email || '',
+          doctor_id: patientData.doctor_id,
+          referred_by: patientData.referred_by || ''
+        })
+
+        console.log('Patient loaded successfully:', patientData.name)
+      } catch (patientError) {
+        console.error('Failed to load patient details:', patientError)
+
+        // If we can't load patient details, create a minimal patient object with the data we have
+        const minimalPatient: Patient = {
+          id: billDetails.bill.patient_id,
+          patient_number: bill.patient_number,
+          name: bill.patient_name,
+          age: '',
+          gender: 'Male',
+          complaint: '',
+          phone: '',
+          house: '',
+          street: '',
+          place: '',
+          email: '',
+          doctor_id: billDetails.bill.doctor_id || 0,
+          doctor_name: bill.doctor_name || '',
+          referred_by: '',
+          registration_date: '',
+          is_ip: false
+        }
+
+        setSelectedPatient(minimalPatient)
+
+        // Update patient form with minimal data
+        setPatientFormData({
+          name: bill.patient_name,
+          age: '',
+          gender: 'Male',
+          complaint: '',
+          house: '',
+          street: '',
+          place: '',
+          phone: '',
+          email: '',
+          doctor_id: billDetails.bill.doctor_id || 0,
+          referred_by: ''
+        })
+
+        toast('Patient details not fully loaded, using minimal data', {
+          icon: '⚠️',
+          duration: 3000
+        })
+      }
+
+      // Now populate the bill items
+      populateFormWithBill(billDetails)
+
+      toast.success(`Bill ${bill.bill_number} loaded successfully`)
+    } catch (error: any) {
+      console.error('Error loading bill details:', error)
+      toast.error('Failed to load bill details')
+      setCurrentAllBillIndex(-1)
     } finally {
       setIsLoadingBillDetails(false)
     }
@@ -435,14 +632,6 @@ setBillItems(initialBillItems);
       category: bill.category || 'General',
       payment_mode: 'Cash'
     })
-
-    // Update patient form data with doctor from bill
-    if (selectedPatient) {
-      setPatientFormData(prev => ({
-        ...prev,
-        doctor_id: bill.doctor_id || prev.doctor_id
-      }))
-    }
 
     // Update bill items
     const mappedItems: BillItem[] = items.map(item => ({
@@ -487,16 +676,29 @@ setBillItems(initialBillItems);
     }
   }
 
+  const handleNextAllBill = () => {
+    if (currentAllBillIndex < allBills.length - 1) {
+      handleLoadBillFromAll(currentAllBillIndex + 1)
+    }
+  }
+
+  const handlePrevAllBill = () => {
+    if (currentAllBillIndex > 0) {
+      handleLoadBillFromAll(currentAllBillIndex - 1)
+    }
+  }
+
   const handleClearCurrentBill = () => {
     setCurrentBillIndex(-1)
-    // Reset bill form to default (keeping patient selected)
+    setCurrentAllBillIndex(-1)
+    billNumberRef.current = generateBillNumber()
+
     setBillFormData({
       bill_type: 'Cash',
       category: 'General',
       payment_mode: 'Cash'
     })
 
-    // Reset to default consultation item
     const defaultDoctorId = selectedPatient?.doctor_id || patientFormData.doctor_id;
     const defaultDoctor = doctors.find(dr => dr.id === defaultDoctorId);
     const defaultParticularId = particulars.length > 0 ? String(particulars[0].id) : '';
@@ -571,31 +773,28 @@ setBillItems(initialBillItems);
       toast.error('Particulars not loaded yet')
       return
     }
-    
-    // Get the main doctor from patient form or selected patient
+
     const mainDoctorId = selectedPatient?.doctor_id || patientFormData.doctor_id;
     const mainDoctor = doctors.find(dr => dr.id === mainDoctorId);
-    
-    // Always use the first particular
+
     const defaultParticularId = particulars.length > 0 ? String(particulars[0].id) : ''
-    
-    // Add new item with default values
-    const newItem: BillItem = { 
+
+    const newItem: BillItem = {
       particular: defaultParticularId,
-      doctor: mainDoctor?.booking_code || '', 
-      doctor_id: mainDoctorId || 0, 
-      department: mainDoctor?.department || 'OPD', 
-      unit: 1, 
-      rate: 0, 
-      amount: 0, 
-      discount_percent: 0, 
-      discount_amount: 0, 
-      total: 0 
+      doctor: mainDoctor?.booking_code || '',
+      doctor_id: mainDoctorId || 0,
+      department: mainDoctor?.department || 'OPD',
+      unit: 1,
+      rate: 0,
+      amount: 0,
+      discount_percent: 0,
+      discount_amount: 0,
+      total: 0
     };
-    
+
     setBillItems(prev => [...prev, newItem]);
   }, [selectedPatient, patientFormData.doctor_id, doctors, particulars])
-  
+
   const removeBillItem = (index: number) => {
     if (billItems.length > 1) {
       const newItems = billItems.filter((_, i) => i !== index)
@@ -616,16 +815,14 @@ setBillItems(initialBillItems);
       toast.error('No bill items to print')
       return
     }
-    
-    // Calculate totals
+
     const { totalAmount, totalDiscount, netAmount } = calculateTotals();
 
-    // Create complete HTML document for printing
     const printHTML = `
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Bill - ${patientFormData.name || 'Patient'}</title>
+          <title>${hospitalConfig.name} - Bill</title>
           <meta charset="UTF-8">
           <style>
             @media print {
@@ -637,11 +834,9 @@ setBillItems(initialBillItems);
               }
               @page { 
                 margin: 15mm;
-                /* Add these to remove header/footer */
                 margin-top: 0;
                 margin-bottom: 0;
                 size: auto;
-                /* Also try these vendor prefixes */
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
               }
@@ -806,23 +1001,21 @@ setBillItems(initialBillItems);
         </head>
         <body>
           <div class="print-container">
-            <!-- Header -->
             <div class="header">
-              <h1>CITY NURSING HOME</h1>
-              <div class="subtitle">NORTH KOTACHERY</div>
-              <div class="subtitle">Phone: 202842, 202574, 2218153</div>
+              <h1>${hospitalConfig.name}</h1>
+              <div class="subtitle">${hospitalConfig.address}</div>
+              <div class="subtitle">Phone: ${hospitalConfig.phone}</div>
+              ${hospitalConfig.email ? `<div class="subtitle">Email: ${hospitalConfig.email}</div>` : ''}
+              ${hospitalConfig.website ? `<div class="subtitle">${hospitalConfig.website}</div>` : ''}
             </div>
             
-            <!-- Patient Information -->
             <div class="patient-info">
               <div class="patient-grid">
-                <!-- Name -->
                 <div class="patient-item">
                   <span class="patient-label">Name:</span>
                   <span class="patient-value">${patientFormData.name || 'N/A'}</span>
                 </div>
                 
-                <!-- Age/Gender -->
                 <div class="patient-item">
                   <span class="patient-label">Age/Gender:</span>
                   <span class="patient-value">
@@ -830,7 +1023,6 @@ setBillItems(initialBillItems);
                   </span>
                 </div>
                 
-                <!-- Patient Number -->
                 <div class="patient-item">
                   <span class="patient-label">Patient No:</span>
                   <span class="patient-value">
@@ -838,13 +1030,11 @@ setBillItems(initialBillItems);
                   </span>
                 </div>
                 
-                <!-- Phone -->
                 <div class="patient-item">
                   <span class="patient-label">Phone:</span>
                   <span class="patient-value">${patientFormData.phone || 'N/A'}</span>
                 </div>
                 
-                <!-- Doctor -->
                 <div class="patient-item">
                   <span class="patient-label">Doctor:</span>
                   <span class="patient-value">
@@ -852,13 +1042,11 @@ setBillItems(initialBillItems);
                   </span>
                 </div>
                 
-                <!-- Referred By -->
                 <div class="patient-item">
                   <span class="patient-label">Referred By:</span>
                   <span class="patient-value">${patientFormData.referred_by || 'N/A'}</span>
                 </div>
                 
-                <!-- Address -->
                 <div class="patient-item col-span-2">
                   <span class="patient-label">Address:</span>
                   <span class="patient-value">
@@ -866,7 +1054,6 @@ setBillItems(initialBillItems);
                   </span>
                 </div>
                 
-                <!-- Complaint -->
                 <div class="patient-item col-span-4">
                   <span class="patient-label">Complaint:</span>
                   <span class="patient-value">${patientFormData.complaint || 'Not specified'}</span>
@@ -874,7 +1061,6 @@ setBillItems(initialBillItems);
               </div>
             </div>
             
-            <!-- Bill Items -->
             ${billItems.length > 0 ? `
               <div style="margin-top: 24px;">
                 <div class="section-title">Bill Items</div>
@@ -883,58 +1069,26 @@ setBillItems(initialBillItems);
                     <tr>
                       <th>#</th>
                       <th>Particular</th>
-                      <th>Doctor</th>
-                      <th>Department</th>
-                      <th>Unit</th>
-                      <th>Rate</th>
                       <th class="amount-column">Amount</th>
-                      <th>Dis%</th>
-                      <th class="amount-column">Disc Amt</th>
-                      <th class="amount-column">Total</th>
                     </tr>
                   </thead>
                   <tbody>
                     ${billItems.map((bi, index) => {
-                      const particularName = particulars.find(p => String(p.id) === bi.particular)?.name || bi.particular
-                      const displayAmount = typeof bi.amount === 'number'
-                        ? bi.amount.toFixed(2)
-                        : typeof bi.amount === 'string'
-                          ? (parseFloat(bi.amount) || 0).toFixed(2)
-                          : '0.00';
+      const particularName = particulars.find(p => String(p.id) === bi.particular)?.name || bi.particular
+      const displayTotal = typeof bi.total === 'number'
+        ? bi.total.toFixed(2)
+        : typeof bi.total === 'string'
+          ? (parseFloat(bi.total) || 0).toFixed(2)
+          : '0.00';
 
-                      const displayRate = typeof bi.rate === 'number'
-                        ? bi.rate.toFixed(2)
-                        : typeof bi.rate === 'string'
-                          ? (parseFloat(bi.rate) || 0).toFixed(2)
-                          : '0.00';
-
-                      const displayDiscount = typeof bi.discount_amount === 'number'
-                        ? bi.discount_amount.toFixed(2)
-                        : typeof bi.discount_amount === 'string'
-                          ? (parseFloat(bi.discount_amount) || 0).toFixed(2)
-                          : '0.00';
-
-                      const displayTotal = typeof bi.total === 'number'
-                        ? bi.total.toFixed(2)
-                        : typeof bi.total === 'string'
-                          ? (parseFloat(bi.total) || 0).toFixed(2)
-                          : '0.00';
-
-                      return `
+      return `
                         <tr>
                           <td>${index + 1}</td>
-                          <td>${particularName}</td>
-                          <td>${bi.doctor || ''}</td>
-                          <td>${bi.department || ''}</td>
-                          <td>${bi.unit || 1}</td>
-                          <td>${displayRate}</td>
-                          <td class="amount-column">${displayAmount}</td>
-                          <td>${bi.discount_percent || 0}%</td>
-                          <td class="amount-column">${displayDiscount}</td>
+                          <td>${particularName}</td>                          
                           <td class="amount-column">${displayTotal}</td>
                         </tr>
                       `;
-                    }).join('')}
+    }).join('')}
                   </tbody>
                 </table>
               </div>
@@ -944,10 +1098,9 @@ setBillItems(initialBillItems);
               </div>
             `}
             
-            <!-- Totals Section -->
             <div class="totals-section">
               <div class="totals-grid">
-                <div></div>
+                
                 <div class="total-item">
                   <span class="total-label">Total Amount:</span>
                   <span class="total-value">₹${totalAmount.toFixed(2)}</span>
@@ -956,7 +1109,7 @@ setBillItems(initialBillItems);
                   <span class="total-label">Total Discount:</span>
                   <span class="total-value" style="color: #dc2626;">-₹${totalDiscount.toFixed(2)}</span>
                 </div>
-                <div></div>
+                
                 <div class="total-item">
                   <span class="total-label">Net Amount:</span>
                   <span class="total-value net-total">₹${netAmount.toFixed(2)}</span>
@@ -964,7 +1117,6 @@ setBillItems(initialBillItems);
               </div>
             </div>
             
-            <!-- Bill Details -->
             <div style="margin-top: 24px; padding: 16px; background-color: #f0f9ff; border-radius: 6px;">
               <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; font-size: 14px;">
                 <div>
@@ -982,24 +1134,21 @@ setBillItems(initialBillItems);
               </div>
             </div>
             
-            <!-- Footer -->
             <div class="footer">
               <div class="footer-content">
                 <div>
-                  <!-- Use persistent bill number instead of generating new one -->
                   <div>Bill Number: ${billNumberRef.current}</div>
                   <div style="margin-top: 4px;">Printed: ${new Date().toLocaleDateString()}</div>
                   <div style="margin-top: 4px;">Time: ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                 </div>
                 <div style="text-align: right;">
-                  <div>Thank you for your visit</div>
+                  <div>${hospitalConfig.footer_note || 'Thank you for your visit'}</div>
                   <div style="margin-top: 4px;">Page 1 of 1</div>
                 </div>
               </div>
             </div>
           </div>
           
-          <!-- Print Button (only visible on screen) -->
           <div class="no-print" style="margin-top: 20px; text-align: center;">
             <button onclick="window.print()" style="
               background-color: #3b82f6;
@@ -1029,7 +1178,6 @@ setBillItems(initialBillItems);
           </div>
           
           <script>
-            // Close window after printing (if in iframe)
             window.onafterprint = function() {
               if (window.frameElement) {
                 setTimeout(function() {
@@ -1042,7 +1190,6 @@ setBillItems(initialBillItems);
       </html>
     `;
 
-    // Create a hidden iframe for printing
     const iframe = document.createElement('iframe');
     iframe.name = 'print-iframe';
     iframe.style.position = 'fixed';
@@ -1062,12 +1209,8 @@ setBillItems(initialBillItems);
       iframeDoc.write(printHTML);
       iframeDoc.close();
 
-      // Wait for content to load
       iframe.onload = () => {
-        // Focus the iframe for better print dialog behavior
         iframe.contentWindow?.focus();
-
-        // Auto-print (optional - you can remove this if you want manual print button)
         setTimeout(() => {
           iframe.contentWindow?.print();
         }, 1000);
@@ -1079,24 +1222,21 @@ setBillItems(initialBillItems);
   };
 
   const handleSaveBill = async () => {
-    // Validate bill items have valid particulars
-    const hasInvalidParticulars = billItems.some(item => 
+    const hasInvalidParticulars = billItems.some(item =>
       !item.particular || item.particular === '' || item.particular === 'undefined'
     );
-    
+
     if (hasInvalidParticulars) {
       toast.error('Please ensure all bill items have valid particulars selected');
       return;
     }
 
-    // If selected patient exists, update it, otherwise create new
     if (!selectedPatient && (!patientFormData.name || !patientFormData.age || !patientFormData.gender ||
       !patientFormData.complaint || !patientFormData.phone || !patientFormData.doctor_id)) {
       toast.error('Please fill all required patient details')
       return
     }
 
-    // Validate Bill
     const { netAmount } = calculateTotals()
     if (netAmount <= 0) {
       toast.error('Total amount must be greater than 0')
@@ -1109,7 +1249,6 @@ setBillItems(initialBillItems);
       let patientId = selectedPatient?.id
       let patientNumber = selectedPatient?.patient_number
 
-      // If no selected patient, create new
       if (!selectedPatient) {
         const patientData = {
           ...patientFormData,
@@ -1119,16 +1258,15 @@ setBillItems(initialBillItems);
           is_ip: false
         }
 
-        const patientResponse = await axios.post('/patients', patientData)
+        const patientResponse = await axios.post(`${API_BASE_URL}/patients`, patientData)
         patientId = patientResponse.data.id
         patientNumber = patientResponse.data.patient_number
       }
 
-      // Create Bill - use persistent bill number
       const billData = {
         patient_id: patientId,
         patient_number: patientNumber,
-        bill_number: billNumberRef.current, // Use persistent bill number
+        bill_number: billNumberRef.current,
         bill_type: billFormData.bill_type,
         category: billFormData.category,
         payment_mode: billFormData.payment_mode,
@@ -1143,7 +1281,7 @@ setBillItems(initialBillItems);
         }))
       }
 
-      await axios.post('/bills/op', billData)
+      await axios.post(`${API_BASE_URL}/bills/op`, billData)
 
       toast.success(`OP Bill created successfully! 
         Patient: ${patientNumber}
@@ -1160,14 +1298,14 @@ setBillItems(initialBillItems);
   }
 
   const handleResetForms = () => {
-    // Generate new bill number when resetting forms
     billNumberRef.current = generateBillNumber()
-    
+
     setSelectedPatient(null)
     setPreviousBills([])
     setCurrentBillIndex(-1)
+    setCurrentAllBillIndex(-1)
     setShowPreviousBills(false)
-    
+
     setPatientFormData({
       name: '',
       age: '',
@@ -1181,35 +1319,32 @@ setBillItems(initialBillItems);
       doctor_id: doctors[0]?.id || 0,
       referred_by: ''
     })
-    
+
     setBillFormData({
       bill_type: 'Cash',
       category: 'General',
       payment_mode: 'Cash'
     })
-    
-    // Reset bill items with default consultation
+
     const defaultDoctorId = doctors[0]?.id || 0;
     const defaultDoctor = doctors.find(dr => dr.id === defaultDoctorId);
-    
-    // Use the first particular from particulars array
     const defaultParticularId = particulars.length > 0 ? String(particulars[0].id) : ''
-    
+
     setBillItems([
-      { 
+      {
         particular: defaultParticularId,
-        doctor: defaultDoctor?.booking_code || '', 
-        doctor_id: defaultDoctorId, 
-        department: defaultDoctor?.department || 'OPD', 
-        unit: 1, 
-        rate: 0, 
-        amount: 0, 
-        discount_percent: 0, 
-        discount_amount: 0, 
-        total: 0 
+        doctor: defaultDoctor?.booking_code || '',
+        doctor_id: defaultDoctorId,
+        department: defaultDoctor?.department || 'OPD',
+        unit: 1,
+        rate: 0,
+        amount: 0,
+        discount_percent: 0,
+        discount_amount: 0,
+        total: 0
       }
     ])
-    
+
     setSearchQuery('')
     setShowSearchResults(false)
   }
@@ -1217,16 +1352,106 @@ setBillItems(initialBillItems);
   const { totalAmount, totalDiscount, netAmount } = calculateTotals()
 
   // Show loading state while data is being fetched
-  if (!isDataLoaded || billItems.length === 0) {
+  if (!isDataLoaded || billItems.length === 0 || isLoadingHospital) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="animate-spin mx-auto mb-4" size={32} />
-          <p className="text-gray-600">Loading bill entry form...</p>
+          <p className="text-gray-600">
+            {isLoadingHospital ? 'Loading hospital configuration...' : 'Loading bill entry form...'}
+          </p>
         </div>
       </div>
     )
   }
+
+  const handleClearAll = () => {
+    // Check if there are unsaved changes
+    const hasBillChanges = billItems.some(item => item.rate > 0 || item.unit > 1);
+    const hasPatientChanges = patientFormData.name.trim() !== '' ||
+      patientFormData.phone.trim() !== '';
+
+    if (hasBillChanges || hasPatientChanges) {
+      const confirmClear = window.confirm(
+        'Are you sure you want to clear everything?\n' +
+        'This will remove all current patient and bill data.'
+      );
+
+      if (!confirmClear) return;
+    }
+
+    // Reset all navigation states
+    setCurrentBillIndex(-1);
+    setCurrentAllBillIndex(-1);
+
+    // Generate new bill number
+    billNumberRef.current = generateBillNumber();
+
+    // Clear patient data
+    setSelectedPatient(null);
+    setPreviousBills([]);
+    setShowPreviousBills(false);
+
+    // Reset patient form to empty
+    setPatientFormData({
+      name: '',
+      age: '',
+      gender: 'Male',
+      complaint: '',
+      house: '',
+      street: '',
+      place: '',
+      phone: '',
+      email: '',
+      doctor_id: doctors[0]?.id || 0,
+      referred_by: ''
+    });
+
+    // Reset bill form to defaults
+    setBillFormData({
+      bill_type: 'Cash',
+      category: 'General',
+      payment_mode: 'Cash'
+    });
+
+    // Reset bill items to single default item
+    const defaultDoctorId = doctors[0]?.id || 0;
+    const defaultDoctor = doctors.find(dr => dr.id === defaultDoctorId);
+
+    // Get default OP particular
+    const defaultParticulars = particulars
+      .filter(par => par.opdefault === true)
+      .sort((a, b) => a.sortorder - b.sortorder);
+
+    const defaultParticularId = defaultParticulars.length > 0
+      ? String(defaultParticulars[0].id)
+      : particulars.length > 0
+        ? String(particulars[0].id)
+        : '';
+
+    setBillItems([{
+      particular: defaultParticularId,
+      doctor: defaultDoctor?.booking_code || '',
+      doctor_id: defaultDoctorId,
+      department: defaultDoctor?.department || 'OPD',
+      unit: 1,
+      rate: 0,
+      amount: 0,
+      discount_percent: 0,
+      discount_amount: 0,
+      total: 0
+    }]);
+
+    // Clear search results
+    setShowSearchResults(false);
+    setSearchQuery('');
+    setPatients([]);
+
+    toast.success('Ready to create new bill', {
+      icon: '📝',
+      duration: 2000
+    });
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -1236,10 +1461,88 @@ setBillItems(initialBillItems);
           <div className="flex items-center space-x-3">
             <Building size={24} />
             <div>
-              <h1 className="text-xl font-bold">Outpatient Bill Entry</h1>
-              {/* Display persistent bill number from ref */}
-              <div className="text-sm text-blue-100 opacity-90">
-                Bill #: {billNumberRef.current} | Date: {format(new Date(), 'dd/MM/yyyy HH:mm')}
+              <h1 className="text-xl font-bold">{hospitalConfig.name} - OP Bill Entry</h1>
+              <div className="flex items-center space-x-4 mt-1">
+                <div className="text-sm text-blue-100 opacity-90">
+                  Bill #: {billNumberRef.current} | Date: {format(new Date(), 'dd/MM/yyyy HH:mm')}
+                </div>
+
+                {/* All Bills Navigation */}
+                <div className="flex items-center space-x-1 ml-4">
+                  <button
+                    onClick={() => fetchAllBills()}
+                    className="p-1.5 bg-white/10 hover:bg-white/20 rounded"
+                    title="Load All Bills"
+                  >
+                    <ListFilter size={14} />
+                  </button>
+
+                  <button
+                    onClick={handlePrevAllBill}
+                    disabled={currentAllBillIndex <= 0 || isLoadingBillDetails || allBills.length === 0}
+                    className="p-1.5 bg-white/10 hover:bg-white/20 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Previous Bill"
+                  >
+                    <ArrowLeft size={14} />
+                  </button>
+
+                  <div className="text-xs px-2 py-1 bg-white/20 rounded min-w-[60px] text-center">
+                    {currentAllBillIndex === -1 ? (
+                      'New'
+                    ) : (
+                      <>
+                        <div>{allBills[currentAllBillIndex]?.bill_number}</div>
+                        <div className="text-[10px] opacity-75">
+                          {currentAllBillIndex + 1} / {allBills.length}
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={handleNextAllBill}
+                    disabled={currentAllBillIndex >= allBills.length - 1 || isLoadingBillDetails || allBills.length === 0}
+                    className="p-1.5 bg-white/10 hover:bg-white/20 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Next Bill"
+                  >
+                    <ArrowRight size={14} />
+                  </button>
+
+                  {(currentAllBillIndex !== -1 || currentBillIndex !== -1) && (
+                    <button
+                      onClick={handleClearAll}
+                      disabled={isLoadingBillDetails}
+                      className="ml-2 px-2 py-1 text-xs bg-white/20 hover:bg-white/30 rounded disabled:opacity-50"
+                    >
+                      New Bill
+                    </button>
+                  )}
+                </div>
+
+                {/* Patient-specific navigation */}
+                {selectedPatient && previousBills.length > 0 && (
+                  <div className="flex items-center space-x-1 ml-2 border-l border-white/30 pl-2">
+                    <button
+                      onClick={handlePrevBill}
+                      disabled={currentBillIndex <= 0 || isLoadingBillDetails}
+                      className="p-1 bg-white/10 hover:bg-white/20 rounded disabled:opacity-50"
+                      title="Previous Patient Bill"
+                    >
+                      <ChevronLeft size={12} />
+                    </button>
+                    <div className="text-xs px-1.5 py-0.5 bg-white/10 rounded">
+                      {currentBillIndex === -1 ? 'New' : `${currentBillIndex + 1}/${previousBills.length}`}
+                    </div>
+                    <button
+                      onClick={handleNextBill}
+                      disabled={currentBillIndex >= previousBills.length - 1 || isLoadingBillDetails}
+                      className="p-1 bg-white/10 hover:bg-white/20 rounded disabled:opacity-50"
+                      title="Next Patient Bill"
+                    >
+                      <ChevronRight size={12} />
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1254,6 +1557,28 @@ setBillItems(initialBillItems);
 
       {/* Main Content */}
       <div className="p-4 space-y-4">
+        {/* Load Recent OP Bills Button */}
+        {allBills.length === 0 && !isLoadingAllBills && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <button
+              onClick={() => fetchAllBills()}
+              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              <ListFilter className="mr-2" size={16} />
+              Load Recent OP Bills
+            </button>
+          </div>
+        )}
+
+        {isLoadingAllBills && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <div className="flex items-center text-blue-700">
+              <Loader2 className="animate-spin mr-2" size={16} />
+              Loading recent bills...
+            </div>
+          </div>
+        )}
+
         {/* Search Patient Section */}
         {!selectedPatient && (
           <div className="bg-white rounded-lg shadow border border-gray-200">
@@ -1624,7 +1949,7 @@ setBillItems(initialBillItems);
                     value={patientFormData.place}
                     onChange={(e) => setPatientFormData({ ...patientFormData, place: e.target.value })}
                     className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
-                    placeholder="City"
+                    placeholder="Your city"
                   />
                 </div>
 
@@ -1728,120 +2053,118 @@ setBillItems(initialBillItems);
           </div>
 
           <div className="p-3">
+            {/* Bill Items Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full border border-gray-200 text-sm">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="px-2 py-2 border text-center">#</th>
+                    <th className="px-2 py-2 border text-left">Particular</th>
+                    <th className="px-2 py-2 border text-left">Doctor</th>
+                    <th className="px-2 py-2 border text-left">Department</th>
+                    <th className="px-2 py-2 border text-center">Unit</th>
+                    <th className="px-2 py-2 border text-center">Rate</th>
+                    <th className="px-2 py-2 border text-center">Amount</th>
+                    <th className="px-2 py-2 border text-center">Dis%</th>
+                    <th className="px-2 py-2 border text-center">Disc Amt</th>
+                    <th className="px-2 py-2 border text-center">Total</th>
+                    <th className="px-2 py-2 border text-center">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {billItems.map((item, index) => {
+                    const mainDoctorId = selectedPatient?.doctor_id || patientFormData.doctor_id;
+                    const mainDoctor = doctors.find(dr => dr.id === mainDoctorId);
+                    const bookingCode = mainDoctor?.code || '';
+                    const department = departments.find(dp => dp.id === Number(mainDoctor?.department))?.name || 'OPD';
 
-{/* Bill Items Table */}
-<div className="overflow-x-auto">
-  <table className="w-full border border-gray-200 text-sm">
-    <thead className="bg-gray-100">
-      <tr>
-        <th className="px-2 py-2 border text-center">#</th>
-        <th className="px-2 py-2 border text-left">Particular</th>
-        <th className="px-2 py-2 border text-left">Doctor</th>
-        <th className="px-2 py-2 border text-left">Department</th>
-        <th className="px-2 py-2 border text-center">Unit</th>
-        <th className="px-2 py-2 border text-center">Rate</th>
-        <th className="px-2 py-2 border text-center">Amount</th>
-        <th className="px-2 py-2 border text-center">Dis%</th>
-        <th className="px-2 py-2 border text-center">Disc Amt</th>
-        <th className="px-2 py-2 border text-center">Total</th>
-        <th className="px-2 py-2 border text-center">Action</th>
-      </tr>
-    </thead>
-    <tbody>
-      {billItems.map((item, index) => {
-        // Get the main doctor from patient form or selected patient
-        const mainDoctorId = selectedPatient?.doctor_id || patientFormData.doctor_id;
-        const mainDoctor = doctors.find(dr => dr.id === mainDoctorId);
-        const bookingCode = mainDoctor?.code || '';
-        const department = departments.find(dp => dp.id === Number(mainDoctor?.department))?.name || 'OPD';
-        
-        return (
-          <tr key={index} className="hover:bg-gray-50">
-            <td className="px-2 py-1.5 border text-center">{index + 1}</td>
-            
-            {/* Particular Cell - Always visible dropdown */}
-            <td className="px-2 py-1.5 border">
-              <div className="relative">
-                <select
-                  value={item.particular}
-                  onChange={(e) => handleBillItemChange(index, 'particular', e.target.value)}
-                  className="w-full px-1 py-0.5 border border-gray-300 rounded text-xs appearance-none pr-6"
-                >
-                  {particulars.map((particular, idx) => (
-                    <option key={idx} value={particular.id}>
-                      {particular.name}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-1 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" size={12} />
-              </div>
-            </td>
-            
-            {/* Doctor Cell - Readonly booking code from main doctor */}
-            <td className="px-2 py-1.5 border">
-              <div className="px-1 py-0.5 min-h-[28px] flex items-center">
-                <span className="font-medium">{bookingCode}</span>
-              </div>
-            </td>
-            
-            {/* Department Cell - Readonly department from main doctor */}
-            <td className="px-2 py-1.5 border">
-              <div className="px-1 py-0.5 min-h-[28px] flex items-center">
-                <span className="font-medium">{department}</span>
-              </div>
-            </td>
-            
-            <td className="px-2 py-1.5 border">
-              <input
-                type="text"
-                value={item.unit}
-                onChange={(e) => handleBillItemChange(index, 'unit', parseInt(e.target.value) || 0)}
-                className="w-full px-1 py-0.5 border border-gray-300 rounded text-xs text-center"
-                min="1"
-              />
-            </td>
-            <td className="px-2 py-1.5 border">
-              <input
-                type="text"
-                value={item.rate}
-                onChange={(e) => handleBillItemChange(index, 'rate', parseFloat(e.target.value) || 0)}
-                className="w-full px-1 py-0.5 border border-gray-300 rounded text-xs text-center"
-              />
-            </td>
-            <td className="px-2 py-1.5 border text-center font-medium">
-              ₹{item.amount.toFixed(2)}
-            </td>
-            <td className="px-2 py-1.5 border">
-              <input
-                type="text"
-                value={item.discount_percent}
-                onChange={(e) => handleBillItemChange(index, 'discount_percent', parseFloat(e.target.value) || 0)}
-                className="w-full px-1 py-0.5 border border-gray-300 rounded text-xs text-center"
-                max="100"
-              />
-            </td>
-            <td className="px-2 py-1.5 border text-center text-red-600 font-medium">
-              ₹{item.discount_amount.toFixed(2)}
-            </td>
-            <td className="px-2 py-1.5 border text-center text-green-700 font-bold">
-              ₹{item.total.toFixed(2)}
-            </td>
-            <td className="px-2 py-1.5 border text-center">
-              {billItems.length > 1 && (
-                <button
-                  onClick={() => removeBillItem(index)}
-                  className="text-red-500 hover:text-red-700 text-sm"
-                >
-                  ×
-                </button>
-              )}
-            </td>
-          </tr>
-        );
-      })}
-    </tbody>
-  </table>
-</div>
+                    return (
+                      <tr key={index} className="hover:bg-gray-50">
+                        <td className="px-2 py-1.5 border text-center">{index + 1}</td>
+
+                        {/* Particular Cell */}
+                        <td className="px-2 py-1.5 border">
+                          <div className="relative">
+                            <select
+                              value={item.particular}
+                              onChange={(e) => handleBillItemChange(index, 'particular', e.target.value)}
+                              className="w-full px-1 py-0.5 border border-gray-300 rounded text-xs appearance-none pr-6"
+                            >
+                              {particulars.map((particular, idx) => (
+                                <option key={idx} value={particular.id}>
+                                  {particular.name}
+                                </option>
+                              ))}
+                            </select>
+                            <ChevronDown className="absolute right-1 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" size={12} />
+                          </div>
+                        </td>
+
+                        {/* Doctor Cell */}
+                        <td className="px-2 py-1.5 border">
+                          <div className="px-1 py-0.5 min-h-[28px] flex items-center">
+                            <span className="font-medium">{bookingCode}</span>
+                          </div>
+                        </td>
+
+                        {/* Department Cell */}
+                        <td className="px-2 py-1.5 border">
+                          <div className="px-1 py-0.5 min-h-[28px] flex items-center">
+                            <span className="font-medium">{department}</span>
+                          </div>
+                        </td>
+
+                        <td className="px-2 py-1.5 border">
+                          <input
+                            type="text"
+                            value={item.unit}
+                            onChange={(e) => handleBillItemChange(index, 'unit', parseInt(e.target.value) || 0)}
+                            className="w-full px-1 py-0.5 border border-gray-300 rounded text-xs text-center"
+                            min="1"
+                          />
+                        </td>
+                        <td className="px-2 py-1.5 border">
+                          <input
+                            type="text"
+                            value={item.rate}
+                            onChange={(e) => handleBillItemChange(index, 'rate', parseFloat(e.target.value) || 0)}
+                            className="w-full px-1 py-0.5 border border-gray-300 rounded text-xs text-center"
+                          />
+                        </td>
+                        <td className="px-2 py-1.5 border text-center font-medium">
+                          ₹{item.amount.toFixed(2)}
+                        </td>
+                        <td className="px-2 py-1.5 border">
+                          <input
+                            type="text"
+                            value={item.discount_percent}
+                            onChange={(e) => handleBillItemChange(index, 'discount_percent', parseFloat(e.target.value) || 0)}
+                            className="w-full px-1 py-0.5 border border-gray-300 rounded text-xs text-center"
+                            max="100"
+                          />
+                        </td>
+                        <td className="px-2 py-1.5 border text-center text-red-600 font-medium">
+                          ₹{item.discount_amount.toFixed(2)}
+                        </td>
+                        <td className="px-2 py-1.5 border text-center text-green-700 font-bold">
+                          ₹{item.total.toFixed(2)}
+                        </td>
+                        <td className="px-2 py-1.5 border text-center">
+                          {billItems.length > 1 && (
+                            <button
+                              onClick={() => removeBillItem(index)}
+                              className="text-red-500 hover:text-red-700 text-sm"
+                            >
+                              ×
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
             <div className="flex justify-between items-center mt-3">
               <button
                 onClick={addBillItem}
@@ -1886,7 +2209,7 @@ setBillItems(initialBillItems);
 
             <div className="flex space-x-2">
               <button
-                onClick={handleResetForms}
+                onClick={handleClearAll}
                 className="px-4 py-2 border border-gray-300 text-gray-700 text-sm rounded hover:bg-gray-50"
               >
                 Clear All
@@ -1901,7 +2224,7 @@ setBillItems(initialBillItems);
 
               <button
                 onClick={handleSaveBill}
-                disabled={isLoading}
+                disabled={isLoading || currentBillIndex !== -1 || currentAllBillIndex !== -1}
                 className="px-6 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white text-sm rounded hover:from-blue-700 hover:to-cyan-700 disabled:opacity-50"
               >
                 {isLoading ? 'Saving...' : 'Save Bill'}

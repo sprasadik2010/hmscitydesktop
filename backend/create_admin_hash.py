@@ -7,7 +7,7 @@ from passlib.context import CryptContext
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Connect to database
-conn = sqlite3.connect('hms_lite.db')
+conn = sqlite3.connect('pms_lite.db')
 cursor = conn.cursor()
 
 # Use a shorter password that works with bcrypt

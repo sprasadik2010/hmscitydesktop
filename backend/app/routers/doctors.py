@@ -4,7 +4,7 @@ from typing import List
 import random
 
 from typing import Optional
-from database import get_db
+from ...database import get_db
 from .auth import get_current_user
 from ..models import Doctor
 from ..schemas import DoctorCreate, DoctorResponse

@@ -1,10 +1,21 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
-import { X, Search, Building, CalendarClock, Bed, Loader2, Users, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react'
+import { X, Search, Building, CalendarClock, Bed, Loader2, Users, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ArrowLeft, ArrowRight, ListFilter } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
 import type { AxiosError } from 'axios'
+
+const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://127.0.0.1:8000';
+
+interface HospitalConfig {
+  name: string;
+  address: string;
+  phone: string;
+  email?: string;
+  website?: string;
+  footer_note?: string;
+}
 
 interface BillItem {
   particular: string  // This stores the particular ID (as string)
@@ -95,6 +106,19 @@ interface Particular {
   created_at: string;
 }
 
+interface BillNavigation {
+  id: number
+  bill_number: string
+  bill_date: string
+  patient_name: string
+  patient_number: string
+  total_amount: number
+  net_amount: number
+  category: string
+  doctor_name: string
+  room: string
+}
+
 const IPBillEntry = () => {
   const navigate = useNavigate()
   const [currentTime] = useState(new Date())
@@ -110,12 +134,29 @@ const IPBillEntry = () => {
   const [patients, setPatients] = useState<Patient[]>([])
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
 
+  // Hospital settings
+  const [hospitalConfig, setHospitalConfig] = useState<HospitalConfig>({
+    name: '',
+    address: '',
+    phone: '',
+    email: '',
+    website: '',
+    footer_note: 'Thank you for your visit'
+  })
+  const [isLoadingHospital, setIsLoadingHospital] = useState(true)
+
   // Previous bills states
   const [previousBills, setPreviousBills] = useState<PreviousBill[]>([])
   const [currentBillIndex, setCurrentBillIndex] = useState<number>(-1)
   const [isLoadingBills, setIsLoadingBills] = useState(false)
   const [showPreviousBills, setShowPreviousBills] = useState(false)
   const [isLoadingBillDetails, setIsLoadingBillDetails] = useState(false)
+
+  // All bills navigation
+  const [allBills, setAllBills] = useState<BillNavigation[]>([])
+  const [isLoadingAllBills, setIsLoadingAllBills] = useState(false)
+  const [currentAllBillIndex, setCurrentAllBillIndex] = useState<number>(-1)
+
   const [particulars, setParticulars] = useState<Particular[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
   const [billParticularsnDepts, setBillParticularsnDepts] = useState<BillPurtcularsnDept[]>([])
@@ -153,61 +194,76 @@ const IPBillEntry = () => {
 
   const [billItems, setBillItems] = useState<BillItem[]>([])
 
+  // Fetch hospital settings on mount
+  useEffect(() => {
+    fetchHospitalSettings()
+  }, [])
+
   // Initialize bill number on component mount
   useEffect(() => {
     if (!billNumberRef.current) {
       billNumberRef.current = generateBillNumber()
     }
-    
+
     fetchInitialData()
   }, [])
 
   // Initialize bill items when billParticularsnDepts, particulars, and departments are set
   useEffect(() => {
-  if (billParticularsnDepts.length > 0 && billItems.length === 0 && particulars.length > 0 && departments.length > 0) {
-    // Filter to only get IP default particulars
-    const ipDefaultParticulars = particulars.filter(p => p.ipdefault === true);
-    
-    // If no IP defaults found, use the first particular as fallback
-    const defaultParticulars = ipDefaultParticulars.length > 0 
-      ? ipDefaultParticulars 
-      : [particulars[0]];
-    
-    // Sort by sortorder if available
-    const sortedParticulars = [...defaultParticulars].sort((a, b) => 
-      (a.sortorder || 0) - (b.sortorder || 0)
-    );
+    if (billParticularsnDepts.length > 0 && billItems.length === 0 && particulars.length > 0 && departments.length > 0) {
+      // Filter to only get IP default particulars
+      const ipDefaultParticulars = particulars.filter(p => p.ipdefault === true);
 
-    // Create initial bill items
-    const initialBillItems = sortedParticulars.map((particular) => {
-      // Find department for this particular (if you have a mapping)
-      // Or use the default department from billParticularsnDepts
-      const defaultDept = billParticularsnDepts.find(pnd => pnd.particular === particular.name);
-      const department = departments.find(d => d.name === (defaultDept?.department || 'General'));
-      
-      return {
-        particular: particular.id.toString(),
-        department: department ? department.id.toString() : '',
-        amount: 0,
-        discount_percent: 0,
-        discount_amount: 0,
-        total: 0,
-        // For IP bills, doctor_id should be 0 or not included at all
-        // Check your IPBillItemCreate schema - if it has doctor_id with default 0
-        doctor_id: 0 // or remove this field if not needed
-      }
-    })
-    
-    setBillItems(initialBillItems)
+      // If no IP defaults found, use the first particular as fallback
+      const defaultParticulars = ipDefaultParticulars.length > 0
+        ? ipDefaultParticulars
+        : [particulars[0]];
+
+      // Sort by sortorder if available
+      const sortedParticulars = [...defaultParticulars].sort((a, b) =>
+        (a.sortorder || 0) - (b.sortorder || 0)
+      );
+
+      // Create initial bill items
+      const initialBillItems = sortedParticulars.map((particular) => {
+        // Find department for this particular (if you have a mapping)
+        // Or use the default department from billParticularsnDepts
+        const defaultDept = billParticularsnDepts.find(pnd => pnd.particular === particular.name);
+        const department = departments.find(d => d.name === (defaultDept?.department || 'General'));
+
+        return {
+          particular: particular.id.toString(),
+          department: department ? department.id.toString() : '',
+          amount: 0,
+          discount_percent: 0,
+          discount_amount: 0,
+          total: 0,
+          doctor_id: 0
+        }
+      })
+
+      setBillItems(initialBillItems)
+    }
+  }, [billParticularsnDepts, billItems.length, particulars, departments])
+
+  const fetchHospitalSettings = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/settings/hospital`)
+      setHospitalConfig(response.data)
+    } catch (error) {
+      console.error('Failed to load hospital settings, using defaults')
+      // Keep default values
+    } finally {
+      setIsLoadingHospital(false)
+    }
   }
-}, [billParticularsnDepts, billItems.length, particulars, departments])
 
   const fetchInitialData = async () => {
     setIsLoading(true)
     try {
       // Fetch doctors first
       await fetchDoctors()
-      
+
       // Then fetch departments and particulars
       await Promise.all([
         fetchDepartments(),
@@ -222,7 +278,7 @@ const IPBillEntry = () => {
 
   const fetchDepartments = async () => {
     try {
-      const response = await axios.get('/settings/departments', {
+      const response = await axios.get(`${API_BASE_URL}/settings/departments`, {
         params: { active_only: false }
       })
       setDepartments(response.data)
@@ -234,12 +290,12 @@ const IPBillEntry = () => {
 
   const fetchParticulars = async () => {
     try {
-      const response = await axios.get('/settings/particulars', {
+      const response = await axios.get(`${API_BASE_URL}/settings/particulars`, {
         params: { active_only: false }
       })
       const particularsData = response.data
       setParticulars(particularsData)
-      
+
       // Initialize billParticularsnDepts if we have particulars
       if (particularsData.length > 0) {
         const initialBillParticulars = particularsData.map((particular: Particular) => ({
@@ -248,7 +304,7 @@ const IPBillEntry = () => {
         }))
         setBillParticularsnDepts(initialBillParticulars)
       }
-      
+
       return particularsData
     } catch (error) {
       console.error('Error fetching particulars:', error)
@@ -273,7 +329,7 @@ const IPBillEntry = () => {
 
   const fetchDoctors = async () => {
     try {
-      const response = await axios.get('/doctors')
+      const response = await axios.get(`${API_BASE_URL}/doctors`)
       setDoctors(response.data)
       if (response.data.length > 0) {
         const doctorId = response.data[0].id
@@ -291,6 +347,31 @@ const IPBillEntry = () => {
     }
   }
 
+  const fetchAllBills = async (limit: number = 100) => {
+    setIsLoadingAllBills(true)
+    try {
+      const response = await axios.get(`${API_BASE_URL}/bills/ip/all`, {
+        params: { limit, offset: 0 }
+      })
+      const sortedBills = response.data.sort((a: any, b: any) =>
+        new Date(b.bill_date).getTime() - new Date(a.bill_date).getTime()
+      )
+      setAllBills(sortedBills)
+
+      if (sortedBills.length > 0) {
+        toast.success(`Loaded ${sortedBills.length} recent IP bills`)
+      }
+
+      return sortedBills
+    } catch (error) {
+      console.error('Error fetching all IP bills:', error)
+      toast.error('Failed to load IP bills')
+      return []
+    } finally {
+      setIsLoadingAllBills(false)
+    }
+  }
+
   const searchPatients = async () => {
     if (!searchQuery.trim()) {
       toast.error('Please enter search term')
@@ -299,7 +380,7 @@ const IPBillEntry = () => {
 
     setIsSearching(true)
     try {
-      const response = await axios.get(`/patients/search/ip/${encodeURIComponent(searchQuery)}`)
+      const response = await axios.get(`${API_BASE_URL}/patients/search/ip/${encodeURIComponent(searchQuery)}`)
       const ipPatients = response.data
       setPatients(ipPatients)
       setShowSearchResults(true)
@@ -364,7 +445,7 @@ const IPBillEntry = () => {
   const fetchPreviousBills = async (patientId: number) => {
     setIsLoadingBills(true)
     try {
-      const response = await axios.get(`/bills/ip/${patientId}`)
+      const response = await axios.get(`${API_BASE_URL}/bills/ip/${patientId}`)
       // Sort bills by date (newest first)
       const sortedBills = response.data.sort((a: any, b: any) =>
         new Date(b.bill_date).getTime() - new Date(a.bill_date).getTime()
@@ -405,11 +486,40 @@ const IPBillEntry = () => {
       setIsLoadingBillDetails(true)
 
       // Fetch complete bill details with items using your API
-      const response = await axios.get(`/bills/ip/details/${bill.id}`)
+      const response = await axios.get(`${API_BASE_URL}/bills/ip/details/${bill.id}`)
       const billDetails: BillDetails = response.data
 
       // Update current bill index
       setCurrentBillIndex(index)
+      setCurrentAllBillIndex(-1)
+
+      // Update bill number
+      billNumberRef.current = bill.bill_number
+
+      // Try to fetch patient details
+      try {
+        const patientResponse = await axios.get(`${API_BASE_URL}/patients/${billDetails.bill.patient_id}`)
+        const patientData = patientResponse.data
+
+        setSelectedPatient(patientData)
+        setPatientFormData({
+          name: patientData.name,
+          age: patientData.age,
+          gender: patientData.gender,
+          complaint: patientData.complaint,
+          house: patientData.house,
+          street: patientData.street,
+          place: patientData.place,
+          phone: patientData.phone,
+          email: patientData.email || '',
+          doctor_id: patientData.doctor_id,
+          referred_by: patientData.referred_by || '',
+          room: patientData.room || '',
+          admission_date: patientData.admission_date || format(new Date(), 'yyyy-MM-dd')
+        })
+      } catch (error) {
+        console.error('Failed to load patient details:', error)
+      }
 
       // Populate form with loaded bill data
       await populateFormWithBill(billDetails)
@@ -419,6 +529,98 @@ const IPBillEntry = () => {
       console.error('Error loading bill details:', error)
       toast.error('Failed to load bill details')
       setCurrentBillIndex(-1)
+    } finally {
+      setIsLoadingBillDetails(false)
+    }
+  }
+
+  const handleLoadBillFromAll = async (index: number) => {
+    if (index < 0 || index >= allBills.length) return
+
+    const bill = allBills[index]
+
+    const confirmLoad = window.confirm(
+      `Load bill ${bill.bill_number} from ${format(new Date(bill.bill_date), 'dd/MM/yyyy')}?\n` +
+      `Patient: ${bill.patient_name}\n` +
+      `Room: ${bill.room}\n` +
+      `This will replace your current bill items.`
+    )
+
+    if (!confirmLoad) return
+
+    try {
+      setIsLoadingBillDetails(true)
+
+      // Fetch bill details
+      const billResponse = await axios.get(`${API_BASE_URL}/bills/ip/details/${bill.id}`)
+      const billDetails: BillDetails = billResponse.data
+
+      // Update states
+      setCurrentAllBillIndex(index)
+      setCurrentBillIndex(-1)
+      billNumberRef.current = bill.bill_number
+
+      // Try to fetch patient details
+      try {
+        const patientResponse = await axios.get(`${API_BASE_URL}/patients/${billDetails.bill.patient_id}`)
+        const patientData = patientResponse.data
+
+        setSelectedPatient(patientData)
+        setPatientFormData({
+          name: patientData.name,
+          age: patientData.age,
+          gender: patientData.gender,
+          complaint: patientData.complaint,
+          house: patientData.house,
+          street: patientData.street,
+          place: patientData.place,
+          phone: patientData.phone,
+          email: patientData.email || '',
+          doctor_id: patientData.doctor_id,
+          referred_by: patientData.referred_by || '',
+          room: patientData.room || '',
+          admission_date: patientData.admission_date || format(new Date(), 'yyyy-MM-dd')
+        })
+      } catch (error) {
+        console.error('Failed to load patient details:', error)
+        // Create minimal patient from bill data
+        const patientFromBill: Patient = {
+          id: billDetails.bill.patient_id,
+          patient_number: bill.patient_number,
+          name: bill.patient_name,
+          age: '',
+          gender: 'Male',
+          complaint: '',
+          phone: '',
+          house: '',
+          street: '',
+          place: '',
+          email: '',
+          doctor_id: billDetails.bill.doctor_id || 0,
+          doctor_name: bill.doctor_name || '',
+          referred_by: '',
+          room: bill.room || '',
+          admission_date: billDetails.bill.admission_date || format(new Date(), 'yyyy-MM-dd'),
+          is_ip: true
+        }
+
+        setSelectedPatient(patientFromBill)
+        setPatientFormData(prev => ({
+          ...prev,
+          name: bill.patient_name,
+          doctor_id: billDetails.bill.doctor_id || prev.doctor_id,
+          room: bill.room || ''
+        }))
+      }
+
+      // Populate the bill items
+      await populateFormWithBill(billDetails)
+
+      toast.success(`Bill ${bill.bill_number} loaded successfully`)
+    } catch (error: any) {
+      console.error('Error loading bill details:', error)
+      toast.error('Failed to load bill details')
+      setCurrentAllBillIndex(-1)
     } finally {
       setIsLoadingBillDetails(false)
     }
@@ -458,7 +660,7 @@ const IPBillEntry = () => {
         // Find IDs for particular and department
         let particularId = ''
         let departmentId = ''
-        
+
         // Find particular ID by name
         const particular = particulars.find(p => p.name === item.particular)
         if (particular) {
@@ -467,7 +669,7 @@ const IPBillEntry = () => {
           // If particular not found, try to get it from the first available
           particularId = particulars.length > 0 ? particulars[0].id.toString() : ''
         }
-        
+
         // Find department ID by name
         const department = departments.find(d => d.name === item.department)
         if (department) {
@@ -476,7 +678,7 @@ const IPBillEntry = () => {
           // If department not found, try to get it from the first available
           departmentId = departments.length > 0 ? departments[0].id.toString() : ''
         }
-        
+
         return {
           particular: particularId,
           department: departmentId,
@@ -495,7 +697,7 @@ const IPBillEntry = () => {
         // Find IDs for particular and department
         const particular = particulars.find(p => p.name === PnD.particular)
         const department = departments.find(d => d.name === PnD.department)
-        
+
         return {
           particular: particular ? particular.id.toString() : '',
           department: department ? department.id.toString() : '',
@@ -522,10 +724,63 @@ const IPBillEntry = () => {
     }
   }
 
-  const handleClearCurrentBill = () => {
-    setCurrentBillIndex(-1)
+  const handleNextAllBill = () => {
+    if (currentAllBillIndex < allBills.length - 1) {
+      handleLoadBillFromAll(currentAllBillIndex + 1)
+    }
+  }
 
-    // Reset bill form to default (keeping patient selected)
+  const handlePrevAllBill = () => {
+    if (currentAllBillIndex > 0) {
+      handleLoadBillFromAll(currentAllBillIndex - 1)
+    }
+  }
+
+  const handleClearAll = () => {
+    // Check if there are unsaved changes
+    const hasBillChanges = billItems.some(item => item.amount > 0 || item.discount_percent > 0);
+    const hasPatientChanges = patientFormData.name.trim() !== '' ||
+      patientFormData.phone.trim() !== '';
+
+    if (hasBillChanges || hasPatientChanges) {
+      const confirmClear = window.confirm(
+        'Are you sure you want to clear everything?\n' +
+        'This will remove all current patient and bill data.'
+      );
+
+      if (!confirmClear) return;
+    }
+
+    // Reset all navigation states
+    setCurrentBillIndex(-1);
+    setCurrentAllBillIndex(-1);
+
+    // Generate new bill number
+    billNumberRef.current = generateBillNumber();
+
+    // Clear patient data
+    setSelectedPatient(null);
+    setPreviousBills([]);
+    setShowPreviousBills(false);
+
+    // Reset patient form to empty
+    setPatientFormData({
+      name: '',
+      age: '',
+      gender: 'Male',
+      complaint: '',
+      house: '',
+      street: '',
+      place: '',
+      phone: '',
+      email: '',
+      doctor_id: doctors[0]?.id || 0,
+      referred_by: '',
+      room: '',
+      admission_date: format(new Date(), 'yyyy-MM-dd')
+    });
+
+    // Reset bill form to defaults
     setBillFormData({
       bill_type: 'Cash',
       category: 'General',
@@ -537,15 +792,14 @@ const IPBillEntry = () => {
       service_tax: 0,
       education_cess: 0,
       she_education_cess: 0
-    })
+    });
 
-    // Reset bill items using billParticularsnDepts with current patient's doctor
-    const doctorId = selectedPatient?.doctor_id || patientFormData.doctor_id
+    // Reset bill items to default items
+    const doctorId = doctors[0]?.id || 0;
     const defaultItems = billParticularsnDepts.map(PnD => {
-      // Find IDs for particular and department
-      const particular = particulars.find(p => p.name === PnD.particular)
-      const department = departments.find(d => d.name === PnD.department)
-      
+      const particular = particulars.find(p => p.name === PnD.particular);
+      const department = departments.find(d => d.name === PnD.department);
+
       return {
         particular: particular ? particular.id.toString() : '',
         department: department ? department.id.toString() : '',
@@ -554,15 +808,31 @@ const IPBillEntry = () => {
         discount_percent: 0,
         discount_amount: 0,
         total: 0
-      }
-    })
-    setBillItems(defaultItems)
+      };
+    });
 
-    toast('Ready to create new bill', {
+    setBillItems(defaultItems.length > 0 ? defaultItems : [
+      {
+        particular: particulars.length > 0 ? particulars[0].id.toString() : '',
+        department: departments.length > 0 ? departments[0].id.toString() : '',
+        amount: 0,
+        discount_percent: 0,
+        discount_amount: 0,
+        total: 0,
+        doctor_id: doctorId
+      }
+    ]);
+
+    // Clear search results
+    setShowSearchResults(false);
+    setSearchQuery('');
+    setPatients([]);
+
+    toast.success('Ready to create new bill', {
       icon: '📝',
       duration: 2000
-    })
-  }
+    });
+  };
 
   const generateBillNumber = () => {
     const now = new Date()
@@ -588,12 +858,12 @@ const IPBillEntry = () => {
   const addBillItem = () => {
     setBillItems([
       ...billItems,
-      { 
-        particular: particulars.length > 0 ? particulars[0].id.toString() : '', 
-        department: departments.length > 0 ? departments[0].id.toString() : '', 
-        amount: 0, 
-        discount_percent: 0, 
-        discount_amount: 0, 
+      {
+        particular: particulars.length > 0 ? particulars[0].id.toString() : '',
+        department: departments.length > 0 ? departments[0].id.toString() : '',
+        amount: 0,
+        discount_percent: 0,
+        discount_amount: 0,
         total: 0,
         doctor_id: selectedPatient?.doctor_id || patientFormData.doctor_id
       }
@@ -620,50 +890,69 @@ const IPBillEntry = () => {
 
   const handlePrintBill = () => {
     // Calculate total safely
-    const calculateTotal = () => {
-      let total = 0;
-      billItems.forEach(item => {
-        const amount = typeof item.amount === 'string'
-          ? parseFloat(item.amount) || 0
-          : typeof item.amount === 'number'
-            ? item.amount
-            : 0;
-        total += amount;
-      });
-      return total.toFixed(2);
-    };
+    // const calculateTotal = () => {
+    //   let total = 0;
+    //   billItems.forEach(item => {
+    //     const amount = typeof item.amount === 'string'
+    //       ? parseFloat(item.amount) || 0
+    //       : typeof item.amount === 'number'
+    //         ? item.amount
+    //         : 0;
+    //     total += amount;
+    //   });
+    //   return total.toFixed(2);
+    // };
 
-    const totalAmount = calculateTotal();
+    // const totalAmount = calculateTotal();
+
+    const { netAmount } = calculateTotals();
 
     // Create complete HTML document for printing
     const printHTML = `
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Bill - ${patientFormData.name || 'Patient'}</title>
+          <title>${hospitalConfig.name} - Bill</title>
           <meta charset="UTF-8">
           <style>
-            @media print {
+          /* For screen preview */
+@media screen {
+  body { 
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    min-height: 100vh !important;
+  }
+}
+
+/* For print preview */
+@media print {
+  body { 
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    min-height: 100vh !important;
+  }
+}
+           /* @media print {
               body { 
                 margin: 0; 
                 padding: 0;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
-              }
+              } */
               @page { 
                 margin: 15mm;
-                /* Add these to remove header/footer */
                 margin-top: 0;
                 margin-bottom: 0;
                 size: auto;
-                /* Also try these vendor prefixes */
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
               }
               .no-print { display: none !important; }
             }
             
-            @media screen {
+            /* @media screen {
               body { 
                 background-color: #f3f4f6;
                 padding: 20px;
@@ -673,7 +962,7 @@ const IPBillEntry = () => {
                 background-color: white;
                 border-radius: 8px;
               }
-            }
+            } */
             
             body {
               font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -698,7 +987,7 @@ const IPBillEntry = () => {
             .header .heading {
               font-size: 20px;
               font-weight: bold;
-              font-decoration: underline;
+              text-decoration: underline;
               color: #111827;
               margin: 8px 0 0 0;
             }
@@ -805,9 +1094,11 @@ const IPBillEntry = () => {
           <div class="print-container">
             <!-- Header -->
             <div class="header">
-                <h1>CITY NURSING HOME</h1>
-                <div class="subtitle">NORTH KOTACHERY</div>
-                <div class="subtitle">Phone: 202842, 202574, 2218153</div>
+                <h1>${hospitalConfig.name}</h1>
+                <div class="subtitle">${hospitalConfig.address}</div>
+                <div class="subtitle">Phone: ${hospitalConfig.phone}</div>
+                ${hospitalConfig.email ? `<div class="subtitle">Email: ${hospitalConfig.email}</div>` : ''}
+                ${hospitalConfig.website ? `<div class="subtitle">${hospitalConfig.website}</div>` : ''}
                 <div class="heading">CASH BILL</div>
               </div>
             
@@ -831,6 +1122,11 @@ const IPBillEntry = () => {
                   <span class="patient-value">${doctors.filter(dr => dr.id == patientFormData.doctor_id).at(0)?.name || 'Not assigned'}</span>
                 </div>
 
+                <!-- Room -->
+                <div class="patient-item">
+                  <span class="patient-label">Room:</span>
+                  <span class="patient-value">${patientFormData.room || 'N/A'}</span>
+                </div>
               </div>
             </div>
             
@@ -843,25 +1139,22 @@ const IPBillEntry = () => {
                     <tr>
                       <th>#</th>
                       <th>Particular</th>
-                      <th>Department</th>
                       <th class="amount-column">Amount</th>
                     </tr>
                   </thead>
                   <tbody>
                     ${billItems.map((bi, index) => {
       const particularName = getParticularName(bi.particular)
-      const departmentName = getDepartmentName(bi.department)
-      const displayAmount = typeof bi.amount === 'number'
-        ? bi.amount.toFixed(2)
-        : typeof bi.amount === 'string'
-          ? (parseFloat(bi.amount) || 0).toFixed(2)
+      const displayAmount = typeof bi.total === 'number'
+        ? bi.total.toFixed(2)
+        : typeof bi.total === 'string'
+          ? (parseFloat(bi.total) || 0).toFixed(2)
           : '0.00'
 
       return `
                         <tr>
                           <td>${index + 1}</td>
                           <td>${particularName}</td>
-                          <td>${departmentName}</td>
                           <td class="amount-column">${displayAmount}</td>
                         </tr>
                       `;
@@ -869,8 +1162,8 @@ const IPBillEntry = () => {
                     
                     <!-- Total Row -->
                     <tr class="total-row">
-                      <td colspan="3" style="text-align: right; padding-right: 12px;">Total Amount:</td>
-                      <td class="amount-column">${totalAmount}</td>
+                      <td colspan="2" style="text-align: right; padding-right: 12px;">Net Amount:</td>
+                      <td class="amount-column">₹${netAmount.toFixed(2)}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -889,7 +1182,7 @@ const IPBillEntry = () => {
                   <div style="margin-top: 4px;">Time: ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                 </div>
                 <div style="text-align: right;">
-                  <div>Thank you for your visit</div>
+                  <div>${hospitalConfig.footer_note || 'Thank you for your visit'}</div>
                   <div style="margin-top: 4px;">Page 1 of 1</div>
                 </div>
               </div>
@@ -1013,7 +1306,7 @@ const IPBillEntry = () => {
           is_ip: true
         }
 
-        const patientResponse = await axios.post('/patients', patientData)
+        const patientResponse = await axios.post(`${API_BASE_URL}/patients`, patientData)
         patientId = patientResponse.data.id
         patientNumber = patientResponse.data.patient_number
       }
@@ -1040,14 +1333,12 @@ const IPBillEntry = () => {
         items: billItems.map(item => ({
           particular: item.particular,  // Send ID to backend
           department: item.department,  // Send ID to backend
-          // particular: getParticularName(item.particular),  // Also send name for reference
-          // department: getDepartmentName(item.department),  // Also send name for reference
           amount: item.amount,
           discount_percent: item.discount_percent
         }))
       }
 
-      await axios.post('/bills/ip', billData)
+      await axios.post(`${API_BASE_URL}/bills/ip`, billData)
 
       toast.success(`IP Bill created successfully! 
         Patient: ${patientNumber}
@@ -1055,7 +1346,7 @@ const IPBillEntry = () => {
         Bill: ${billData.bill_number}
         Amount: ₹${netAmount.toFixed(2)}`)
 
-      handleResetForms()
+      handleClearAll()
 
     } catch (error: any) {
       toast.error(error.response?.data?.detail || 'Failed to save bill')
@@ -1064,68 +1355,19 @@ const IPBillEntry = () => {
     }
   }
 
-  const handleResetForms = () => {
-    // Generate new bill number only when resetting the form
-    billNumberRef.current = generateBillNumber()
-
-    setSelectedPatient(null)
-    setPreviousBills([])
-    setCurrentBillIndex(-1)
-    setShowPreviousBills(false)
-
-    setPatientFormData({
-      name: '',
-      age: '',
-      gender: 'Male',
-      complaint: '',
-      house: '',
-      street: '',
-      place: '',
-      phone: '',
-      email: '',
-      doctor_id: doctors[0]?.id || 0,
-      referred_by: '',
-      room: '',
-      admission_date: format(new Date(), 'yyyy-MM-dd')
-    })
-
-    setBillFormData({
-      bill_type: 'Cash',
-      category: 'General',
-      payment_mode: 'Cash',
-      is_insurance: false,
-      is_credit: false,
-      insurance_company: '',
-      policy_number: '',
-      service_tax: 0,
-      education_cess: 0,
-      she_education_cess: 0
-    })
-
-    // Reset bill items using billParticularsnDepts
-    const doctorId = doctors[0]?.id || 0
-    const defaultItems = billParticularsnDepts.map(PnD => {
-      // Find IDs for particular and department
-      const particular = particulars.find(p => p.name === PnD.particular)
-      const department = departments.find(d => d.name === PnD.department)
-      
-      return {
-        particular: particular ? particular.id.toString() : '',
-        department: department ? department.id.toString() : '',
-        doctor_id: doctorId,
-        amount: 0,
-        discount_percent: 0,
-        discount_amount: 0,
-        total: 0
-      }
-    })
-    setBillItems(defaultItems)
-
-    setSearchQuery('')
-    setShowSearchResults(false)
-  }
-
   const { totalAmount, totalDiscount, subTotal, netAmount } = calculateTotals()
+
+  // Show loading state while data is being fetched
+  if (isLoadingHospital) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="animate-spin mx-auto mb-4" size={32} />
+          <p className="text-gray-600">Loading hospital configuration...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -1135,9 +1377,88 @@ const IPBillEntry = () => {
           <div className="flex items-center space-x-3">
             <Building size={24} />
             <div>
-              <h1 className="text-xl font-bold">Inpatient Bill Entry</h1>
-              <div className="text-sm text-purple-100 opacity-90">
-                Bill #: {billNumberRef.current} | Date: {format(new Date(), 'dd/MM/yyyy HH:mm')}
+              <h1 className="text-xl font-bold">{hospitalConfig.name} - Inpatient Bill Entry</h1>
+              <div className="flex items-center space-x-4 mt-1">
+                <div className="text-sm text-purple-100 opacity-90">
+                  Bill #: {billNumberRef.current} | Date: {format(new Date(), 'dd/MM/yyyy HH:mm')}
+                </div>
+
+                {/* All Bills Navigation */}
+                <div className="flex items-center space-x-1 ml-4">
+                  <button
+                    onClick={() => fetchAllBills()}
+                    className="p-1.5 bg-white/10 hover:bg-white/20 rounded"
+                    title="Load All IP Bills"
+                  >
+                    <ListFilter size={14} />
+                  </button>
+
+                  <button
+                    onClick={handlePrevAllBill}
+                    disabled={currentAllBillIndex <= 0 || isLoadingBillDetails || allBills.length === 0}
+                    className="p-1.5 bg-white/10 hover:bg-white/20 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Previous Bill"
+                  >
+                    <ArrowLeft size={14} />
+                  </button>
+
+                  <div className="text-xs px-2 py-1 bg-white/20 rounded min-w-[60px] text-center">
+                    {currentAllBillIndex === -1 ? (
+                      'New'
+                    ) : (
+                      <>
+                        <div>{allBills[currentAllBillIndex]?.bill_number}</div>
+                        <div className="text-[10px] opacity-75">
+                          {currentAllBillIndex + 1} / {allBills.length}
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={handleNextAllBill}
+                    disabled={currentAllBillIndex >= allBills.length - 1 || isLoadingBillDetails || allBills.length === 0}
+                    className="p-1.5 bg-white/10 hover:bg-white/20 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Next Bill"
+                  >
+                    <ArrowRight size={14} />
+                  </button>
+
+                  {(currentAllBillIndex !== -1 || currentBillIndex !== -1) && (
+                    <button
+                      onClick={handleClearAll}
+                      disabled={isLoadingBillDetails}
+                      className="ml-2 px-2 py-1 text-xs bg-white/20 hover:bg-white/30 rounded disabled:opacity-50"
+                    >
+                      New Bill
+                    </button>
+                  )}
+                </div>
+
+                {/* Patient-specific navigation */}
+                {selectedPatient && previousBills.length > 0 && (
+                  <div className="flex items-center space-x-1 ml-2 border-l border-white/30 pl-2">
+                    <button
+                      onClick={handlePrevBill}
+                      disabled={currentBillIndex <= 0 || isLoadingBillDetails}
+                      className="p-1 bg-white/10 hover:bg-white/20 rounded disabled:opacity-50"
+                      title="Previous Patient Bill"
+                    >
+                      <ChevronLeft size={12} />
+                    </button>
+                    <div className="text-xs px-1.5 py-0.5 bg-white/10 rounded">
+                      {currentBillIndex === -1 ? 'New' : `${currentBillIndex + 1}/${previousBills.length}`}
+                    </div>
+                    <button
+                      onClick={handleNextBill}
+                      disabled={currentBillIndex >= previousBills.length - 1 || isLoadingBillDetails}
+                      className="p-1 bg-white/10 hover:bg-white/20 rounded disabled:opacity-50"
+                      title="Next Patient Bill"
+                    >
+                      <ChevronRight size={12} />
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1152,6 +1473,28 @@ const IPBillEntry = () => {
 
       {/* Main Content */}
       <div className="p-4 space-y-4">
+        {/* Load Recent IP Bills Button */}
+        {allBills.length === 0 && !isLoadingAllBills && (
+          <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+            <button
+              onClick={() => fetchAllBills()}
+              className="flex items-center px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
+            >
+              <ListFilter className="mr-2" size={16} />
+              Load Recent IP Bills
+            </button>
+          </div>
+        )}
+
+        {isLoadingAllBills && (
+          <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+            <div className="flex items-center text-purple-700">
+              <Loader2 className="animate-spin mr-2" size={16} />
+              Loading recent IP bills...
+            </div>
+          </div>
+        )}
+
         {/* Search Patient Section */}
         {!selectedPatient && (
           <div className="bg-white rounded-lg shadow border border-gray-200">
@@ -1382,7 +1725,7 @@ const IPBillEntry = () => {
 
                     {currentBillIndex !== -1 && (
                       <button
-                        onClick={handleClearCurrentBill}
+                        onClick={handleClearAll}
                         disabled={isLoadingBillDetails}
                         className="ml-2 px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded hover:bg-gray-200 disabled:opacity-50"
                       >
@@ -1584,7 +1927,7 @@ const IPBillEntry = () => {
                     value={patientFormData.place}
                     onChange={(e) => setPatientFormData({ ...patientFormData, place: e.target.value })}
                     className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
-                    placeholder="City"
+                    placeholder="Your city"
                   />
                 </div>
 
@@ -1867,7 +2210,7 @@ const IPBillEntry = () => {
 
             <div className="flex space-x-2">
               <button
-                onClick={handleResetForms}
+                onClick={handleClearAll}
                 className="px-4 py-2 border border-gray-300 text-gray-700 text-sm rounded hover:bg-gray-50"
               >
                 Clear All
@@ -1880,9 +2223,10 @@ const IPBillEntry = () => {
                 Print
               </button>
 
+              {/* In the action buttons section - around the end of the file */}
               <button
                 onClick={handleSaveBill}
-                disabled={isLoading}
+                disabled={isLoading || currentBillIndex !== -1 || currentAllBillIndex !== -1}
                 className="px-6 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm rounded hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50"
               >
                 {isLoading ? 'Saving...' : 'Save Bill'}

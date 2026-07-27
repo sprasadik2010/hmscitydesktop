@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 import os
 
-from backend.database import create_tables
+from ..database import create_tables
 from .routers import auth, patients, doctors, bills, dashboard, reports, seeder, settings
 
 @asynccontextmanager
@@ -14,29 +14,11 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(
-    title="Hospital Management System - Lite",
-    description="Basic Hospital Management System with OP/IP support",
+    title="Patient Management System - Lite",
+    description="Basic Patient Management System with OP/IP support",
     version="1.0.0",
     lifespan=lifespan
 )
-
-# Configure CORS
-# app.add_middleware(
-#     CORSMiddleware,
-#     allow_origins=[
-#         "http://localhost:5173",      # React dev
-#         "https://citynh.onrender.com", # Deploy
-#         "tauri://localhost",          # Tauri desktop
-#         "app://localhost",
-#         "app://-",                    # Some webview runtimes
-#         "http://127.0.0.1:5173",
-#         "http://localhost",
-#         "http://127.0.0.1",
-#     ],
-#     allow_credentials=True,
-#     allow_methods=["*"],
-#     allow_headers=["*"],
-# )
 
 app.add_middleware(
     CORSMiddleware,
@@ -53,13 +35,13 @@ app.include_router(doctors.router)
 app.include_router(bills.router)
 app.include_router(dashboard.router)
 app.include_router(reports.router)
-app.include_router(seeder.router) 
+app.include_router(seeder.router)
 app.include_router(settings.router)
 
 @app.get("/")
 async def root():
     return {
-        "message": "Hospital Management System API",
+        "message": "Patient Management System API",
         "version": "1.0.0",
         "docs": "/docs",
         "modules": ["OP/IP Registration", "Billing", "Doctor Master", "Reports"]
@@ -71,7 +53,7 @@ async def health_check():
     return {
         "status": "healthy",
         "timestamp": datetime.utcnow().isoformat(),
-        "service": "City Hospital Management System API",
+        "service": "Patient Management System API",
         "environment": os.getenv("ENVIRONMENT", "production"),
         "version": "1.0.0"
     }
